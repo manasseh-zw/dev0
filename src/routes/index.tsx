@@ -1,12 +1,47 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { LogoShowcase } from '@/components/logo'
+"use client";
 
-export const Route = createFileRoute('/')({ component: App })
+import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Settings01Icon, Moon02Icon } from "@hugeicons/core-free-icons";
+import { GridPattern } from "@/components/ui/grid-pattern";
+import { ChatWelcomeScreen } from "@/components/landing";
+
+export const Route = createFileRoute("/")({ component: App });
 
 function App() {
+  const [message, setMessage] = useState("");
+  const [selectedMode, setSelectedMode] = useState("fast");
+  const [selectedModel, setSelectedModel] = useState("dev0-3");
+
+  const handleSend = () => {
+    if (message.trim()) {
+      console.log("Sending message:", message);
+      console.log("Mode:", selectedMode);
+      console.log("Model:", selectedModel);
+      // TODO: Implement actual send logic
+      setMessage("");
+    }
+  };
+
   return (
-    <main className="min-h-screen flex items-center justify-center">
-      <LogoShowcase />
+    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden relative">
+        <GridPattern className="pointer-events-none" />
+
+        <div className="relative z-10 h-full">
+          <ChatWelcomeScreen
+            message={message}
+            onMessageChange={setMessage}
+            onSend={handleSend}
+            selectedMode={selectedMode}
+            onModeChange={setSelectedMode}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+          />
+        </div>
+      </div>
     </main>
-  )
+  );
 }
