@@ -10,9 +10,16 @@
  * 3. GitHub CLI (gh) is installed
  * 4. Gemini CLI is installed and can be invoked
  * 5. Git clone from a public repo
+ * 6. Gemini CLI settings.json with Context7 MCP exists
+ * 7. Gemini CLI .env for API key authentication exists
+ * 8. Gemini YOLO mode with Context7 MCP integration test
  *
  * Usage:
  *   bun run scripts/test-sandbox.ts
+ *
+ * Options:
+ *   --skip-yolo    Skip the YOLO mode integration test (faster)
+ *   --full         Run full integration test including YOLO mode (default)
  *
  * Requirements:
  *   - DAYTONA_API_KEY in .env.local
@@ -27,12 +34,14 @@ import { config } from 'dotenv'
 config({ path: '.env.local' })
 
 const SNAPSHOT_NAME = 'dev0-universal'
+const SKIP_YOLO = process.argv.includes('--skip-yolo')
 
 type TestResult = {
   name: string
   passed: boolean
   output?: string
   error?: string
+  skipped?: boolean
 }
 
 async function runTest(
@@ -54,12 +63,18 @@ async function runTest(
   }
 }
 
+function skipTest(name: string, reason: string): TestResult {
+  console.log(`  ⏭️  Skipped: ${name} (${reason})`)
+  return { name, passed: true, skipped: true, output: reason }
+}
+
 async function testSandbox() {
   const daytona = new Daytona()
 
   console.log('🧪 dev0 Sandbox Test Suite\n')
   console.log('═'.repeat(50))
   console.log(`Snapshot: ${SNAPSHOT_NAME}`)
+  console.log(`Skip YOLO: ${SKIP_YOLO}`)
   console.log('═'.repeat(50))
   console.log('')
 
@@ -153,6 +168,103 @@ async function testSandbox() {
     })
   )
 
+  // Test 8: Gemini settings.json exists with Context7 MCP configuration
+  results.push(
+    await runTest('Gemini Settings (Context7 MCP)', async () => {
+      const response = await sandbox.process.executeCommand(
+        'cat ~/.gemini/settings.json'
+      )
+      if (response.exitCode !== 0) throw new Error(response.result)
+      
+      // Verify the settings contain context7 configuration
+      const settings = JSON.parse(response.result)
+      if (!settings.mcpServers?.context7) {
+        throw new Error('Context7 MCP not configured in settings.json')
+      }
+      
+      // Check for HTTP URL approach (preferred)
+      const ctx7 = settings.mcpServers.context7
+      if (!ctx7.httpUrl || !ctx7.httpUrl.includes('context7.com')) {
+        throw new Error('Context7 MCP httpUrl not properly configured')
+      }
+      if (!ctx7.headers?.CONTEXT7_API_KEY) {
+        throw new Error('Context7 API key not configured in headers')
+      }
+      
+      return { output: 'Context7 MCP configured in ~/.gemini/settings.json (HTTP URL mode)' }
+    })
+  )
+
+  // Test 9: Gemini .env exists with API key
+  results.push(
+    await runTest('Gemini API Key (.env)', async () => {
+      const response = await sandbox.process.executeCommand(
+        'cat ~/.gemini/.env'
+      )
+      if (response.exitCode !== 0) throw new Error(response.result)
+      
+      // Verify the .env contains GEMINI_API_KEY
+      if (!response.result.includes('GEMINI_API_KEY=')) {
+        throw new Error('GEMINI_API_KEY not found in ~/.gemini/.env')
+      }
+      
+      return { output: 'GEMINI_API_KEY configured in ~/.gemini/.env' }
+    })
+  )
+
+  // Test 10: Gemini YOLO mode integration test (optional)
+  if (SKIP_YOLO) {
+    results.push(skipTest('Gemini YOLO Mode + Context7', '--skip-yolo flag used'))
+  } else {
+    console.log('\n🤖 Running Gemini YOLO Mode Integration Test...\n')
+    console.log('   This test will:')
+    console.log('   1. Run Gemini in YOLO mode')
+    console.log('   2. Use Context7 MCP to fetch documentation')
+    console.log('   3. Write the result to a file')
+    console.log('   4. Verify the file was created with content\n')
+    
+    results.push(
+      await runTest('Gemini YOLO Mode + Context7', async () => {
+        // Run Gemini in YOLO mode with a simple Context7 documentation request
+        // Using a simple library and short prompt to minimize execution time
+        const testFile = '/home/daytona/workspace/context7_test.txt'
+        const prompt = `Use context7 to get a brief description of the zod library (just the overview, not full docs). Create a file at ${testFile} containing a one-paragraph summary of what zod is. Be concise.`
+        
+        const response = await sandbox.process.executeCommand(
+          `gemini --yolo --model gemini-3-pro-preview -p "${prompt}"`
+        )
+        
+        // Check if Gemini executed (even if there are warnings)
+        // The key is whether the file was created
+        const fileCheck = await sandbox.process.executeCommand(`cat ${testFile}`)
+        
+        if (fileCheck.exitCode !== 0) {
+          throw new Error(`File not created. Gemini output: ${response.result}`)
+        }
+        
+        const content = fileCheck.result.trim()
+        if (content.length < 10) {
+          throw new Error(`File content too short: "${content}"`)
+        }
+        
+        // Verify the content mentions zod-related terms
+        const lowerContent = content.toLowerCase()
+        if (!lowerContent.includes('zod') && 
+            !lowerContent.includes('schema') && 
+            !lowerContent.includes('validation')) {
+          throw new Error('File content does not appear to be about zod')
+        }
+        
+        return { 
+          output: `YOLO mode successful! Created ${testFile} with ${content.length} chars\n   Preview: "${content.substring(0, 100)}..."` 
+        }
+      })
+    )
+    
+    // Cleanup the test file
+    await sandbox.process.executeCommand('rm -f /home/daytona/workspace/context7_test.txt')
+  }
+
   // Summary
   console.log('\n' + '═'.repeat(50))
   console.log('📊 Test Summary')
@@ -160,9 +272,12 @@ async function testSandbox() {
 
   const passed = results.filter((r) => r.passed).length
   const failed = results.filter((r) => !r.passed).length
+  const skipped = results.filter((r) => r.skipped).length
 
   for (const result of results) {
-    const icon = result.passed ? '✅' : '❌'
+    let icon = result.passed ? '✅' : '❌'
+    if (result.skipped) icon = '⏭️'
+    
     console.log(`${icon} ${result.name}`)
     if (result.output) {
       console.log(`   └─ ${result.output}`)
@@ -175,6 +290,9 @@ async function testSandbox() {
   console.log('')
   console.log(`Passed: ${passed}/${results.length}`)
   console.log(`Failed: ${failed}/${results.length}`)
+  if (skipped > 0) {
+    console.log(`Skipped: ${skipped}/${results.length}`)
+  }
 
   // Cleanup
   console.log('\n🧹 Cleaning up sandbox...')
@@ -191,6 +309,9 @@ async function testSandbox() {
     process.exit(1)
   } else {
     console.log('\n🎉 All tests passed! Snapshot is ready for use.')
+    if (SKIP_YOLO) {
+      console.log('   (Run without --skip-yolo to test Gemini YOLO mode)')
+    }
     process.exit(0)
   }
 }

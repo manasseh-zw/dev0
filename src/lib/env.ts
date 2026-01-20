@@ -36,8 +36,16 @@ export const env = {
   DAYTONA_API_KEY: requireEnv('DAYTONA_API_KEY'),
   DAYTONA_API_URL: requireEnv('DAYTONA_API_URL'),
 
-  // Google Gemini (AI SDK)
+  // Google Gemini (AI SDK for our backend)
   GOOGLE_GENERATIVE_AI_API_KEY: requireEnv('GOOGLE_GENERATIVE_AI_API_KEY'),
+
+  // Agent Gemini API Key (used inside sandboxes for YOLO mode)
+  // This is separate from our backend key - used for autonomous coding in sandboxes
+  AGENT_GEMINI_API_KEY: requireEnv('AGENT_GEMINI_API_KEY'),
+
+  // Context7 MCP API Key (for documentation lookup in sandboxes)
+  // Enables Gemini CLI to fetch live documentation for any library
+  CONTEXT7_API_KEY: requireEnv('CONTEXT7_API_KEY'),
 
   // GitHub
   GITHUB_TOKEN: requireEnv('GITHUB_TOKEN'),
