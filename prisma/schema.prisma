@@ -117,7 +117,7 @@ model Sandbox {
   // Daytona workspace ID
   daytonaId   String        @unique
 
-  status      SandboxStatus @default(CREATING)
+  status      SandboxStatus @default(READY)
 
   // Currently assigned task (optional - preview sandboxes may not have a task)
   taskId      String?       @unique
