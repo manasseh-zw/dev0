@@ -1,28 +1,26 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Settings01Icon, Moon02Icon } from "@hugeicons/core-free-icons";
-import { GridPattern } from "@/components/ui/grid-pattern";
-import { ChatWelcomeScreen } from "@/components/landing";
+import { ChatWelcomeScreen } from '@/components/landing'
+import { GridPattern } from '@/components/ui/grid-pattern'
+import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 
-export const Route = createFileRoute("/")({ component: App });
+export const Route = createFileRoute('/')({ component: App })
 
 function App() {
-  const [message, setMessage] = useState("");
-  const [selectedMode, setSelectedMode] = useState("fast");
-  const [selectedModel, setSelectedModel] = useState("dev0-3");
+  const [message, setMessage] = useState('')
+  const [selectedMode, setSelectedMode] = useState('fast')
+  const [selectedModel, setSelectedModel] = useState('dev0-3')
 
   const handleSend = () => {
     if (message.trim()) {
-      console.log("Sending message:", message);
-      console.log("Mode:", selectedMode);
-      console.log("Model:", selectedModel);
+      console.log('Sending message:', message)
+      console.log('Mode:', selectedMode)
+      console.log('Model:', selectedModel)
       // TODO: Implement actual send logic
-      setMessage("");
+      setMessage('')
     }
-  };
+  }
 
   return (
     <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
@@ -43,5 +41,5 @@ function App() {
         </div>
       </div>
     </main>
-  );
+  )
 }

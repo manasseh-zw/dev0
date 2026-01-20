@@ -1,21 +1,21 @@
-import * as React from "react";
+import * as React from 'react'
 
 export interface LogoProps extends React.SVGProps<SVGSVGElement> {
   /**
    * Width of the logo. Defaults to "auto".
    */
-  width?: string | number;
+  width?: string | number
   /**
    * Height of the logo. Defaults to 40.
    */
-  height?: string | number;
+  height?: string | number
 }
 
 /**
  * Dev0 Logo - Full logo with "dev0" text
  */
 export const Logo = React.forwardRef<SVGSVGElement, LogoProps>(
-  ({ width = "auto", height = 40, className, ...props }, ref) => {
+  ({ width = 'auto', height = 40, className, ...props }, ref) => {
     return (
       <svg
         ref={ref}
@@ -34,8 +34,8 @@ export const Logo = React.forwardRef<SVGSVGElement, LogoProps>(
               y="944.2px"
               style={{
                 fontFamily: "'SKA_cubic01_75_CE'",
-                fontSize: "300px",
-                fill: "currentColor",
+                fontSize: '300px',
+                fill: 'currentColor',
               }}
             >
               dev
@@ -46,10 +46,10 @@ export const Logo = React.forwardRef<SVGSVGElement, LogoProps>(
               y="944.2px"
               style={{
                 fontFamily: "'SKA_cubic01_75_CE'",
-                fontSize: "300px",
-                stroke: "currentColor",
-                strokeWidth: "2.71px",
-                fill: "currentColor",
+                fontSize: '300px',
+                stroke: 'currentColor',
+                strokeWidth: '2.71px',
+                fill: 'currentColor',
               }}
             >
               0
@@ -67,8 +67,8 @@ export const Logo = React.forwardRef<SVGSVGElement, LogoProps>(
                 style={{
                   fontFamily: "'1Bit'",
                   fontWeight: 500,
-                  fontSize: "196.843px",
-                  fill: "currentColor",
+                  fontSize: '196.843px',
+                  fill: 'currentColor',
                 }}
               >
                 0
@@ -81,25 +81,25 @@ export const Logo = React.forwardRef<SVGSVGElement, LogoProps>(
           </g>
         </g>
       </svg>
-    );
-  }
-);
+    )
+  },
+)
 
-Logo.displayName = "Logo";
+Logo.displayName = 'Logo'
 
 export interface LogoIconProps extends React.SVGProps<SVGSVGElement> {
   /**
    * Size of the icon (width and height). Defaults to 24.
    */
-  size?: string | number;
+  size?: string | number
   /**
    * Width of the icon. Overrides size if provided.
    */
-  width?: string | number;
+  width?: string | number
   /**
    * Height of the icon. Overrides size if provided.
    */
-  height?: string | number;
+  height?: string | number
 }
 
 /**
@@ -107,8 +107,8 @@ export interface LogoIconProps extends React.SVGProps<SVGSVGElement> {
  */
 export const LogoIcon = React.forwardRef<SVGSVGElement, LogoIconProps>(
   ({ size = 24, width, height, className, ...props }, ref) => {
-    const computedWidth = width ?? size;
-    const computedHeight = height ?? size;
+    const computedWidth = width ?? size
+    const computedHeight = height ?? size
 
     return (
       <svg
@@ -129,10 +129,10 @@ export const LogoIcon = React.forwardRef<SVGSVGElement, LogoIconProps>(
               y="944.2px"
               style={{
                 fontFamily: "'SKA_cubic01_75_CE'",
-                fontSize: "300px",
-                stroke: "currentColor",
-                strokeWidth: "2.71px",
-                fill: "currentColor",
+                fontSize: '300px',
+                stroke: 'currentColor',
+                strokeWidth: '2.71px',
+                fill: 'currentColor',
               }}
             >
               0
@@ -150,8 +150,8 @@ export const LogoIcon = React.forwardRef<SVGSVGElement, LogoIconProps>(
                 style={{
                   fontFamily: "'1Bit'",
                   fontWeight: 500,
-                  fontSize: "196.843px",
-                  fill: "currentColor",
+                  fontSize: '196.843px',
+                  fill: 'currentColor',
                 }}
               >
                 0
@@ -164,11 +164,11 @@ export const LogoIcon = React.forwardRef<SVGSVGElement, LogoIconProps>(
           </g>
         </g>
       </svg>
-    );
-  }
-);
+    )
+  },
+)
 
-LogoIcon.displayName = "LogoIcon";
+LogoIcon.displayName = 'LogoIcon'
 
 /**
  * LogoShowcase - A component to demonstrate both Logo and LogoIcon
@@ -180,47 +180,43 @@ export const LogoShowcase: React.FC<{ className?: string }> = ({
     <div
       className={className}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "2rem",
-        padding: "2rem",
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '2rem',
+        padding: '2rem',
       }}
     >
       <div
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "1rem",
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem',
         }}
       >
         <Logo height={64} />
-        <span style={{ fontSize: "0.875rem", opacity: 0.6 }}>
-          Full Logo
-        </span>
+        <span style={{ fontSize: '0.875rem', opacity: 0.6 }}>Full Logo</span>
       </div>
 
       <div
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "1rem",
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem',
         }}
       >
         <LogoIcon size={64} />
-        <span style={{ fontSize: "0.875rem", opacity: 0.6 }}>
-          Icon Only
-        </span>
+        <span style={{ fontSize: '0.875rem', opacity: 0.6 }}>Icon Only</span>
       </div>
 
       <div
         style={{
-          display: "flex",
-          gap: "1.5rem",
-          alignItems: "center",
-          marginTop: "1rem",
+          display: 'flex',
+          gap: '1.5rem',
+          alignItems: 'center',
+          marginTop: '1rem',
         }}
       >
         <LogoIcon size={24} />
@@ -229,5 +225,5 @@ export const LogoShowcase: React.FC<{ className?: string }> = ({
         <LogoIcon size={64} />
       </div>
     </div>
-  );
-};
+  )
+}

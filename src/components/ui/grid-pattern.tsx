@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils'
 
 export interface GridPatternProps {
-  className?: string;
+  className?: string
 }
 
 export function GridPattern({ className }: GridPatternProps) {
@@ -9,14 +9,14 @@ export function GridPattern({ className }: GridPatternProps) {
     <>
       {/* Light mode grid pattern */}
       <div
-        className={cn("absolute inset-0 z-0 dark:hidden", className)}
+        className={cn('absolute inset-0 z-0 dark:hidden', className)}
         style={{
           backgroundImage: `
             linear-gradient(to right, #e7e5e4 1px, transparent 1px),
             linear-gradient(to bottom, #e7e5e4 1px, transparent 1px)
           `,
-          backgroundSize: "20px 20px",
-          backgroundPosition: "0 0, 0 0",
+          backgroundSize: '20px 20px',
+          backgroundPosition: '0 0, 0 0',
           maskImage: `
             repeating-linear-gradient(
               to right,
@@ -51,21 +51,21 @@ export function GridPattern({ className }: GridPatternProps) {
             ),
             radial-gradient(ellipse 70% 60% at 50% 0%, #000 60%, transparent 100%)
           `,
-          maskComposite: "intersect",
-          WebkitMaskComposite: "source-in",
+          maskComposite: 'intersect',
+          WebkitMaskComposite: 'source-in',
         }}
       />
 
       {/* Dark mode grid pattern */}
       <div
-        className={cn("absolute inset-0 z-0 hidden dark:block", className)}
+        className={cn('absolute inset-0 z-0 hidden dark:block', className)}
         style={{
           backgroundImage: `
             linear-gradient(to right, #1f1f23 1px, transparent 1px),
             linear-gradient(to bottom, #1f1f23 1px, transparent 1px)
           `,
-          backgroundSize: "20px 20px",
-          backgroundPosition: "0 0, 0 0",
+          backgroundSize: '20px 20px',
+          backgroundPosition: '0 0, 0 0',
           maskImage: `
             repeating-linear-gradient(
               to right,
@@ -100,10 +100,10 @@ export function GridPattern({ className }: GridPatternProps) {
             ),
             radial-gradient(ellipse 70% 60% at 50% 0%, #000 60%, transparent 100%)
           `,
-          maskComposite: "intersect",
-          WebkitMaskComposite: "source-in",
+          maskComposite: 'intersect',
+          WebkitMaskComposite: 'source-in',
         }}
       />
     </>
-  );
+  )
 }
