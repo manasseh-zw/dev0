@@ -15,12 +15,14 @@ export type ProjectSpec = {
 }
 
 export type PlannedTask = {
+  id: string
   title: string
   description: string
   phase: number
   order: number
-  dependsOn: number[]
+  dependencies: string[]
   complexity: 'low' | 'medium' | 'high'
+  geminiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview'
 }
 
 export type ProjectPlan = {

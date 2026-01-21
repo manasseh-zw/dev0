@@ -15,6 +15,7 @@ export type CreateProjectRepositoryOptions = {
   context: string
   techStack: TechStack
   tasks: Task[]
+  readmeContent?: string
 }
 
 export type ProjectRepositoryResult = {
@@ -23,17 +24,6 @@ export type ProjectRepositoryResult = {
   cloneUrl: string
 }
 
-/**
- * High-level orchestration function for creating a complete project repository
- * This is the main entry point called from the Wizard backend
- *
- * Steps:
- * 1. Generate unique repository name
- * 2. Create repository from template
- * 3. Generate all initial file contents
- * 4. Upload files to repository in a single commit
- * 5. Return repository information
- */
 export async function createProjectRepository(
   options: CreateProjectRepositoryOptions,
 ): Promise<ProjectRepositoryResult> {
@@ -50,12 +40,14 @@ export async function createProjectRepository(
     isPrivate: false,
   })
 
-  const readmeContent = generateReadme({
-    name: projectName,
-    description,
-    context,
-    techStack,
-  })
+  const readmeContent =
+    options.readmeContent ??
+    generateReadme({
+      name: projectName,
+      description,
+      context,
+      techStack,
+    })
 
   const tasklistContent = generateTasklist(tasks)
   const learningsContent = getInitialLearningsTemplate()
@@ -79,10 +71,6 @@ export async function createProjectRepository(
   }
 }
 
-/**
- * Update TASKLIST.md after task completion
- * Called by the platform after a task is marked as DONE
- */
 export async function updateTasklist(
   repoName: string,
   tasks: Task[],

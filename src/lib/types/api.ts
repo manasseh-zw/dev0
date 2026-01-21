@@ -5,7 +5,8 @@ export type CreateProjectRequest = {
   vibeInput: string
   techStack: TechStack
   theme?: string
-  name?: string
+  name: string
+  description: string
 }
 
 export type CreateProjectResponse = {
