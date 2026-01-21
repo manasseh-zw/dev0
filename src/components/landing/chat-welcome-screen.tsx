@@ -6,18 +6,14 @@ export interface ChatWelcomeScreenProps {
   message: string
   onMessageChange: (value: string) => void
   onSend: () => void
-  selectedMode: string
-  onModeChange: (modeId: string) => void
-  selectedModel: string
-  onModelChange: (modelId: string) => void
+  isGeneratingPreview?: boolean
 }
 
 export function ChatWelcomeScreen({
   message,
   onMessageChange,
   onSend,
-  selectedModel,
-  onModelChange,
+  isGeneratingPreview = false,
 }: ChatWelcomeScreenProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-4 md:px-8">
@@ -39,8 +35,7 @@ export function ChatWelcomeScreen({
           message={message}
           onMessageChange={onMessageChange}
           onSend={onSend}
-          selectedModel={selectedModel}
-          onModelChange={onModelChange}
+          isGeneratingPreview={isGeneratingPreview}
         />
       </div>
     </div>

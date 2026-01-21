@@ -2,23 +2,35 @@
 
 import { ChatWelcomeScreen } from '@/components/landing'
 import { GridPattern } from '@/components/ui/grid-pattern'
-import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useStore } from '@tanstack/react-store'
+import { getPreview } from '@/lib/actions'
+import { appStore, appActions } from '@/lib/state'
 
 export const Route = createFileRoute('/')({ component: App })
 
 function App() {
-  const [message, setMessage] = useState('')
-  const [selectedMode, setSelectedMode] = useState('fast')
-  const [selectedModel, setSelectedModel] = useState('dev0-3')
+  const navigate = useNavigate()
+  const message = useStore(appStore, (state) => state.vibeInput)
+  const isGeneratingPreview = useStore(appStore, (state) => state.isGeneratingPreview)
 
-  const handleSend = () => {
-    if (message.trim()) {
-      console.log('Sending message:', message)
-      console.log('Mode:', selectedMode)
-      console.log('Model:', selectedModel)
-      // TODO: Implement actual send logic
-      setMessage('')
+  const handleSend = async () => {
+    if (!message.trim()) {
+      return
+    }
+
+    try {
+      appActions.setGeneratingPreview(true)
+      
+      const previewData = await getPreview({ data: { vibeInput: message } })
+      
+      appActions.setPreviewData(previewData)
+      
+      navigate({ to: '/new' })
+    } catch (error) {
+      console.error('Error generating preview:', error)
+      alert('Failed to generate preview. Please try again.')
+      appActions.setGeneratingPreview(false)
     }
   }
 
@@ -31,12 +43,9 @@ function App() {
         <div className="relative z-10 h-full">
           <ChatWelcomeScreen
             message={message}
-            onMessageChange={setMessage}
+            onMessageChange={appActions.setVibeInput}
             onSend={handleSend}
-            selectedMode={selectedMode}
-            onModeChange={setSelectedMode}
-            selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
+            isGeneratingPreview={isGeneratingPreview}
           />
         </div>
       </div>

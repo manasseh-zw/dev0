@@ -1,7 +1,8 @@
 'use client'
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
+import { useStore } from '@tanstack/react-store'
 import { Nextjs, TanStack, React } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { appStore, appActions } from '@/lib/state'
+import { createProject } from '@/lib/actions'
+import { useEffect } from 'react'
 
 export const Route = createFileRoute('/new')({ component: NewProjectPage })
 
@@ -34,17 +38,44 @@ const techStacks = [
 ]
 
 function NewProjectPage() {
+  const navigate = useNavigate()
+  const previewData = useStore(appStore, (state) => state.previewData)
+  const vibeInput = useStore(appStore, (state) => state.vibeInput)
+  const isCreatingProject = useStore(appStore, (state) => state.isCreatingProject)
+
+  useEffect(() => {
+    if (!previewData) {
+      navigate({ to: '/' })
+    }
+  }, [previewData, navigate])
+
   const form = useForm({
     defaultValues: {
-      projectName: 'My Awesome Project',
-      description:
-        'A modern web application built with the latest technologies.',
-      techStack: 'nextjs',
+      projectName: previewData?.name || 'My Awesome Project',
+      description: previewData?.description || 'A modern web application built with the latest technologies.',
+      techStack: previewData?.suggestedTechStack || 'nextjs',
     },
     onSubmit: async ({ value }) => {
-      // TODO: Implement project creation logic
-      console.log('Creating project:', value)
-      alert(JSON.stringify(value, null, 2))
+      try {
+        appActions.setCreatingProject(true)
+        
+        const result = await createProject({
+          data: {
+            name: value.projectName,
+            description: value.description,
+            vibeInput,
+            techStack: value.techStack as 'tanstack-start' | 'react-vite' | 'nextjs',
+          },
+        })
+        
+        appActions.setCurrentProjectId(result.projectId)
+        
+        navigate({ to: result.redirectUrl })
+      } catch (error) {
+        console.error('Error creating project:', error)
+        alert('Failed to create project. Please try again.')
+        appActions.setCreatingProject(false)
+      }
     },
   })
 
@@ -191,8 +222,13 @@ function NewProjectPage() {
 
           {/* Submit Button */}
           <div className="flex items-center justify-end">
-            <Button type="submit" size="lg" className="px-8">
-              Create Project
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="px-8"
+              disabled={isCreatingProject}
+            >
+              {isCreatingProject ? 'Creating Project...' : 'Create Project'}
             </Button>
           </div>
         </form>

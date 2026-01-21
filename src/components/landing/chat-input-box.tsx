@@ -13,10 +13,9 @@ export interface ChatInputBoxProps {
   message: string
   onMessageChange: (value: string) => void
   onSend: () => void
-  selectedModel: string
-  onModelChange: (modelId: string) => void
   showTools?: boolean
   placeholder?: string
+  isGeneratingPreview?: boolean
 }
 
 export function ChatInputBox({
@@ -24,6 +23,7 @@ export function ChatInputBox({
   onMessageChange,
   onSend,
   placeholder = 'Ask anything...',
+  isGeneratingPreview = false,
 }: ChatInputBoxProps) {
   return (
     <div className="rounded-2xl border border-border bg-secondary dark:bg-card p-1">
@@ -62,8 +62,13 @@ export function ChatInputBox({
 
           <div className="flex items-center gap-2">
             <VoiceInput />
-            <Button size="lg" onClick={onSend} className="px-4 rounded-full ">
-              Build
+            <Button 
+              size="lg" 
+              onClick={onSend} 
+              disabled={isGeneratingPreview || !message.trim()}
+              className="px-4 rounded-full"
+            >
+              {isGeneratingPreview ? 'Generating...' : 'Build'}
               <HugeiconsIcon icon={SparklesIcon} className="size-4" />
             </Button>
           </div>
