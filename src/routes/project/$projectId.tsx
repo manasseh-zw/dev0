@@ -1,23 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getProject } from '@/lib/actions'
+import { getMockProject, isMockProjectId } from '@/data/mock'
 
 export const Route = createFileRoute('/project/$projectId')({
   component: ProjectPage,
   loader: async ({ params }) => {
+    // Use mock data for development when projectId is 'mock'
+    if (isMockProjectId(params.projectId)) {
+      const mockData = getMockProject()
+      return mockData
+    }
+    
     const projectData = await getProject({ data: { projectId: params.projectId } })
-    
-    // Log project info to console as requested
-    console.log('=== PROJECT INFO ===')
-    console.log('Project ID:', projectData.id)
-    console.log('Name:', projectData.name)
-    console.log('Description:', projectData.description)
-    console.log('Status:', projectData.status)
-    console.log('Repo URL:', projectData.repoUrl)
-    console.log('Tech Stack:', projectData.techStack)
-    console.log('Total Tasks:', projectData.tasks.length)
-    console.log('Full Project Data:', projectData)
-    console.log('===================')
-    
+
     return projectData
   },
   pendingComponent: () => (
