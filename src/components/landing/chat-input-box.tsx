@@ -5,7 +5,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { VoiceInput } from './voice-input'
+import { VoiceInput } from '@/components/landing/voice-input'
 
 
 

@@ -1,6 +1,6 @@
 
 import { Logo } from '@/components/logo'
-import { ChatInputBox } from './chat-input-box'
+import { ChatInputBox } from '@/components/landing/chat-input-box'
 
 export interface ChatWelcomeScreenProps {
   message: string
