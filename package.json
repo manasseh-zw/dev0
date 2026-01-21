@@ -13,7 +13,8 @@
     "db:studio": "bunx prisma studio",
     "db:generate": "bunx prisma generate",
     "snapshot:create": "bun run scripts/create-snapshot.ts",
-    "snapshot:test": "bun run scripts/test-sandbox.ts"
+    "snapshot:test": "bun run scripts/test-sandbox.ts",
+    "test:github": "bun run scripts/test-github.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.10",
