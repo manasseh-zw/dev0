@@ -26,91 +26,124 @@ const createProjectSchema = z.object({
 export const createProject = createServerFn({ method: 'POST' })
   .inputValidator(createProjectSchema)
   .handler(async ({ data }) => {
-    const { name, description, vibeInput, techStack, theme } = data
+    try {
+      console.log('🚀 [CREATE PROJECT] Starting project creation...')
+      console.log('📝 [CREATE PROJECT] Input data:', { 
+        name: data.name, 
+        techStack: data.techStack,
+        vibeInputLength: data.vibeInput.length 
+      })
 
-    const project = await prisma.project.create({
-      data: {
+      const { name, description, vibeInput, techStack, theme } = data
+
+      // Step 1: Create initial project
+      console.log('💾 [CREATE PROJECT] Creating initial project in database...')
+      const project = await prisma.project.create({
+        data: {
+          name,
+          description,
+          vibeInput,
+          techStack,
+          theme,
+          status: 'PLANNING',
+        },
+      })
+      console.log('✅ [CREATE PROJECT] Project created with ID:', project.id)
+
+      // Step 2: Generate plan with AI
+      console.log('🤖 [CREATE PROJECT] Calling Planner Agent...')
+      const planResult = await generateProjectPlan({
         name,
         description,
         vibeInput,
-        techStack,
-        theme,
-        status: 'PLANNING',
-      },
-    })
+        techStack: techStack as TechStack,
+      })
 
-    const planResult = await generateProjectPlan({
-      name,
-      description,
-      vibeInput,
-      techStack: techStack as TechStack,
-    })
+      if (!planResult.success) {
+        console.error('❌ [CREATE PROJECT] Planner Agent failed:', planResult.error)
+        throw new Error(planResult.error)
+      }
+      console.log('✅ [CREATE PROJECT] Planner Agent completed. Tasks generated:', planResult.data.tasks.length)
 
-    if (!planResult.success) {
-      throw new Error(planResult.error)
+      // Step 3: Update project with spec
+      console.log('💾 [CREATE PROJECT] Updating project with spec content...')
+      const specContent = buildSpecContent(planResult.data.spec)
+      await prisma.project.update({
+        where: { id: project.id },
+        data: { specContent },
+      })
+      console.log('✅ [CREATE PROJECT] Spec content updated')
+
+      // Step 4: Create tasks
+      console.log('📋 [CREATE PROJECT] Creating tasks in database...')
+      const taskIdMap = new Map<string, string>()
+      const tasksWithIds = planResult.data.tasks.map((task) => {
+        const id = randomUUID()
+        taskIdMap.set(task.id, id)
+        return { ...task, id }
+      })
+
+      const taskData = tasksWithIds.map((task) => ({
+        id: task.id,
+        projectId: project.id,
+        title: task.title,
+        description: task.description,
+        phase: task.phase,
+        order: task.order,
+        dependencies: task.dependencies
+          .map((dependencyId) => taskIdMap.get(dependencyId))
+          .filter((dependencyId): dependencyId is string =>
+            Boolean(dependencyId),
+          ),
+      }))
+
+      await prisma.task.createMany({ data: taskData })
+      console.log('✅ [CREATE PROJECT] Created', taskData.length, 'tasks')
+
+      const createdTasks = await prisma.task.findMany({
+        where: { projectId: project.id },
+        orderBy: [{ phase: 'asc' }, { order: 'asc' }],
+      })
+
+      // Step 5: Create GitHub repository
+      console.log('🐙 [CREATE PROJECT] Creating GitHub repository...')
+      const repo = await createProjectRepository({
+        projectName: project.name,
+        description: project.description ?? '',
+        context: buildRepoContext(planResult.data),
+        techStack: techStack as TechStack,
+        tasks: createdTasks,
+        readmeContent: planResult.data.readmeContent,
+      })
+      console.log('✅ [CREATE PROJECT] GitHub repo created:', repo.repoUrl)
+
+      // Step 6: Update project status to READY
+      console.log('💾 [CREATE PROJECT] Updating project status to READY...')
+      await prisma.project.update({
+        where: { id: project.id },
+        data: {
+          status: 'READY',
+          repoUrl: repo.repoUrl,
+          repoName: repo.repoName,
+        },
+      })
+      console.log('✅ [CREATE PROJECT] Project status updated to READY')
+
+      const response: CreateProjectResponse = {
+        projectId: project.id,
+        redirectUrl: `/project/${project.id}`,
+      }
+
+      console.log('🎉 [CREATE PROJECT] Project creation completed successfully!')
+      console.log('📍 [CREATE PROJECT] Redirect URL:', response.redirectUrl)
+
+      return response
+    } catch (error) {
+      console.error('💥 [CREATE PROJECT] ERROR during project creation:')
+      console.error('💥 [CREATE PROJECT] Error details:', error)
+      console.error('💥 [CREATE PROJECT] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      throw error
     }
-
-    const specContent = buildSpecContent(planResult.data.spec)
-
-    await prisma.project.update({
-      where: { id: project.id },
-      data: {
-        specContent,
-      },
-    })
-
-    const taskIdMap = new Map<string, string>()
-    const tasksWithIds = planResult.data.tasks.map((task) => {
-      const id = randomUUID()
-      taskIdMap.set(task.id, id)
-      return { ...task, id }
-    })
-
-    const taskData = tasksWithIds.map((task) => ({
-      id: task.id,
-      projectId: project.id,
-      title: task.title,
-      description: task.description,
-      phase: task.phase,
-      order: task.order,
-      dependencies: task.dependencies
-        .map((dependencyId) => taskIdMap.get(dependencyId))
-        .filter((dependencyId): dependencyId is string =>
-          Boolean(dependencyId),
-        ),
-    }))
-
-    await prisma.task.createMany({ data: taskData })
-
-    const createdTasks = await prisma.task.findMany({
-      where: { projectId: project.id },
-      orderBy: [{ phase: 'asc' }, { order: 'asc' }],
-    })
-
-    const repo = await createProjectRepository({
-      projectName: project.name,
-      description: project.description ?? '',
-      context: buildRepoContext(planResult.data),
-      techStack: techStack as TechStack,
-      tasks: createdTasks,
-      readmeContent: planResult.data.readmeContent,
-    })
-
-    await prisma.project.update({
-      where: { id: project.id },
-      data: {
-        status: 'READY',
-        repoUrl: repo.repoUrl,
-        repoName: repo.repoName,
-      },
-    })
-
-    const response: CreateProjectResponse = {
-      projectId: project.id,
-      redirectUrl: `/project/${project.id}`,
-    }
-
-    return response
   })
 
 function buildSpecContent(spec: ProjectSpec) {
@@ -350,7 +383,7 @@ export const getProjectStats = createServerFn({ method: 'GET' })
   })
 
 export type ProjectStats = {
-  total: number
+  total: number 
   pending: number
   running: number
   review: number

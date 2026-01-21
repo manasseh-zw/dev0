@@ -90,6 +90,9 @@ export class GitHubProvider {
         include_all_branches: false,
       })
 
+      console.log(`[GitHub] Created repo ${repoName} from template ${templateRepoName}`)
+      console.log(`[GitHub] Default branch: ${response.data.default_branch}`)
+
       return {
         name: response.data.name,
         fullName: response.data.full_name,
@@ -107,6 +110,7 @@ export class GitHubProvider {
   /**
    * Create initial files in a repository with a single commit
    * This is used to add README.md, LEARNINGS.md, TASKLIST.md, etc.
+   * Handles both empty repositories and repositories with existing content.
    */
   async createInitialFiles(
     options: CreateInitialFilesOptions,
@@ -115,34 +119,62 @@ export class GitHubProvider {
       options
 
     try {
+      // Get repository info to determine default branch
       const { data: repo } = await this.octokit.rest.repos.get({
         owner: this.owner,
         repo: repoName,
       })
 
-      const defaultBranch = repo.default_branch
+      // GitHub's default_branch might not match where the actual code is
+      // Try common branch names to find which one has commits
+      const branchesToTry = [
+        repo.default_branch,
+        'master',
+        'main',
+      ].filter((b): b is string => Boolean(b))
 
-      const { data: ref } = await this.octokit.rest.git.getRef({
-        owner: this.owner,
-        repo: repoName,
-        ref: `heads/${defaultBranch}`,
-      })
+      let defaultBranch: string | undefined
+      let baseSha: string | undefined
+      let baseTreeSha: string | undefined
 
-      const baseSha = ref.object.sha
+      // Try each branch to find one with commits
+      for (const branch of branchesToTry) {
+        try {
+          const { data: ref } = await this.octokit.rest.git.getRef({
+            owner: this.owner,
+            repo: repoName,
+            ref: `heads/${branch}`,
+          })
 
-      const { data: baseCommit } = await this.octokit.rest.git.getCommit({
-        owner: this.owner,
-        repo: repoName,
-        commit_sha: baseSha,
-      })
+          baseSha = ref.object.sha
 
-      const { data: baseTree } = await this.octokit.rest.git.getTree({
-        owner: this.owner,
-        repo: repoName,
-        tree_sha: baseCommit.tree.sha,
-        recursive: 'true',
-      })
+          const { data: baseCommit } = await this.octokit.rest.git.getCommit({
+            owner: this.owner,
+            repo: repoName,
+            commit_sha: baseSha,
+          })
 
+          baseTreeSha = baseCommit.tree.sha
+          defaultBranch = branch
+          
+          console.log(`[GitHub] Found existing branch with commits: ${branch} for ${repoName}`)
+          break // Found a branch with commits, use it!
+        } catch (error: any) {
+          // This branch doesn't exist or has no commits, try next one
+          continue
+        }
+      }
+
+      // If no branch was found with commits, create on 'master' (template default)
+      if (!defaultBranch) {
+        defaultBranch = 'master'
+        console.log(`[GitHub] No existing branches found, will create first commit on ${defaultBranch}`)
+      }
+
+      console.log(`[GitHub] Using branch: ${defaultBranch} for ${repoName}`)
+
+
+      // Create file tree items
       const treeItems = files.map((file) => ({
         path: file.path,
         mode: '100644' as const,
@@ -150,27 +182,41 @@ export class GitHubProvider {
         content: file.content,
       }))
 
+      // Create the new tree (with or without base tree)
       const { data: newTree } = await this.octokit.rest.git.createTree({
         owner: this.owner,
         repo: repoName,
-        base_tree: baseTree.sha,
         tree: treeItems,
+        ...(baseTreeSha && { base_tree: baseTreeSha }),
       })
 
+      // Create the commit (with or without parent)
       const { data: newCommit } = await this.octokit.rest.git.createCommit({
         owner: this.owner,
         repo: repoName,
         message: commitMessage,
         tree: newTree.sha,
-        parents: [baseSha],
+        ...(baseSha && { parents: [baseSha] }),
       })
 
-      await this.octokit.rest.git.updateRef({
-        owner: this.owner,
-        repo: repoName,
-        ref: `heads/${defaultBranch}`,
-        sha: newCommit.sha,
-      })
+      // Create or update the reference
+      if (baseSha) {
+        // Update existing ref
+        await this.octokit.rest.git.updateRef({
+          owner: this.owner,
+          repo: repoName,
+          ref: `heads/${defaultBranch}`,
+          sha: newCommit.sha,
+        })
+      } else {
+        // Create new ref (first commit)
+        await this.octokit.rest.git.createRef({
+          owner: this.owner,
+          repo: repoName,
+          ref: `refs/heads/${defaultBranch}`,
+          sha: newCommit.sha,
+        })
+      }
     } catch (error) {
       throw new Error(
         `Failed to create initial files: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -182,7 +228,7 @@ export class GitHubProvider {
    * Upload or update a single file in a repository
    */
   async uploadFile(options: UploadFileOptions): Promise<void> {
-    const { repoName, path, content, message, branch = 'main' } = options
+    const { repoName, path, content, message, branch = 'master' } = options
 
     try {
       let sha: string | undefined
@@ -225,7 +271,7 @@ export class GitHubProvider {
   async createPullRequest(
     options: CreatePullRequestOptions,
   ): Promise<PullRequestInfo> {
-    const { repoName, title, body, head, base = 'main' } = options
+    const { repoName, title, body, head, base = 'master' } = options
 
     try {
       const { data: pr } = await this.octokit.rest.pulls.create({

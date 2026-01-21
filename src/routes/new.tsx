@@ -24,13 +24,13 @@ const techStacks = [
     Icon: Nextjs,
   },
   {
-    id: 'tanstack',
+    id: 'tanstack-start',
     title: 'TanStack Start',
     description: 'Full-stack framework powered by TanStack Router',
     Icon: TanStack,
   },
   {
-    id: 'react',
+    id: 'react-vite',
     title: 'React',
     description: 'Pure React with Vite for fast development',
     Icon: React,
