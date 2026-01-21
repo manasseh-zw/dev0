@@ -7,14 +7,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:sandbox": "vitest run tests/sandbox",
+    "test:sandbox": "vitest run tests/sandbox.test.ts",
     "format": "prettier --write .",
     "db:migrate": "bunx prisma migrate dev",
     "db:studio": "bunx prisma studio",
     "db:generate": "bunx prisma generate",
     "snapshot:create": "bun run scripts/create-snapshot.ts",
-    "snapshot:test": "bun run scripts/test-sandbox.ts",
-    "test:github": "bun run scripts/test-github.ts"
+    "snapshot:test": "vitest run tests/sandbox.test.ts",
+    "test:github": "vitest run tests/github.test.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.10",
