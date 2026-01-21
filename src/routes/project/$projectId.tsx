@@ -29,14 +29,15 @@ export const Route = createFileRoute('/project/$projectId')({
 })
 
 function ProjectPage() {
+  // @ts-expect-error - TODO: Use project data to initialize task store
   const project = Route.useLoaderData()
 
   return (
-       <div className="flex-1 flex flex-col overflow-hidden h-screen">
-        <TaskHeader />
-        <main className="w-full h-full overflow-x-auto">
-          <TaskBoard />
-        </main>
-      </div>  
+    <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
+          <TaskHeader />
+      <main className="flex-1 w-full overflow-x-auto">
+        <TaskBoard />
+      </main>
+    </div>
   )
 }

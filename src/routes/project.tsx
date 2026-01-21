@@ -1,4 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { DashboardSidebar } from '@/components/sidebar/app-sidebar'
 
 export const Route = createFileRoute('/project')({
   component: ProjectLayout,
@@ -6,9 +8,13 @@ export const Route = createFileRoute('/project')({
 
 function ProjectLayout() {
   return (
-    <div className="h-screen w-screen bg-background flex flex-col">
-      {/* Project Layout - will contain header, sidebar in the future */}
-      <Outlet />
-    </div>
+    <SidebarProvider>
+      <div className="relative flex h-screen w-full overflow-hidden">
+        <DashboardSidebar />
+        <SidebarInset className="flex flex-col overflow-hidden">
+          <Outlet />
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   )
 }

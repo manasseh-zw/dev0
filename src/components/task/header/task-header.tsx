@@ -20,7 +20,7 @@ import { TaskFilters } from "./task-filters";
 import { TaskSort } from "./task-sort";
 import { TaskAutomate } from "./task-automate";
 import { TaskImportExport } from "./task-import-export";
-import { Link } from "@tanstack/react-router";
+
 
 export function TaskHeader() {
   const [open, setOpen] = React.useState(false);
@@ -80,14 +80,14 @@ export function TaskHeader() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-3 lg:px-6 py-3 border-t border-border overflow-x-auto">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 lg:px-6 py-3 border-t border-border">
         <div className="flex items-center gap-2 shrink-0">
           <TaskFilters />
           <TaskSort />
           <TaskAutomate />
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger>
               <Button
