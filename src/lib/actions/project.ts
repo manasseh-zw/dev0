@@ -8,7 +8,6 @@ import {
 import { prisma } from '@/lib/db'
 import { createProjectRepository } from '@/lib/git'
 import type { TechStack } from '@/lib/templates'
-import type { CreateProjectResponse } from '@/lib/types/api'
 import type { Project, Task } from 'generated/prisma/client'
 import { randomUUID } from 'crypto'
 
@@ -27,17 +26,9 @@ export const createProject = createServerFn({ method: 'POST' })
   .inputValidator(createProjectSchema)
   .handler(async ({ data }) => {
     try {
-      console.log('🚀 [CREATE PROJECT] Starting project creation...')
-      console.log('📝 [CREATE PROJECT] Input data:', { 
-        name: data.name, 
-        techStack: data.techStack,
-        vibeInputLength: data.vibeInput.length 
-      })
-
       const { name, description, vibeInput, techStack, theme } = data
 
       // Step 1: Create initial project
-      console.log('💾 [CREATE PROJECT] Creating initial project in database...')
       const project = await prisma.project.create({
         data: {
           name,
@@ -48,10 +39,8 @@ export const createProject = createServerFn({ method: 'POST' })
           status: 'PLANNING',
         },
       })
-      console.log('✅ [CREATE PROJECT] Project created with ID:', project.id)
 
       // Step 2: Generate plan with AI
-      console.log('🤖 [CREATE PROJECT] Calling Planner Agent...')
       const planResult = await generateProjectPlan({
         name,
         description,
@@ -60,22 +49,17 @@ export const createProject = createServerFn({ method: 'POST' })
       })
 
       if (!planResult.success) {
-        console.error('❌ [CREATE PROJECT] Planner Agent failed:', planResult.error)
         throw new Error(planResult.error)
       }
-      console.log('✅ [CREATE PROJECT] Planner Agent completed. Tasks generated:', planResult.data.tasks.length)
 
       // Step 3: Update project with spec
-      console.log('💾 [CREATE PROJECT] Updating project with spec content...')
       const specContent = buildSpecContent(planResult.data.spec)
       await prisma.project.update({
         where: { id: project.id },
         data: { specContent },
       })
-      console.log('✅ [CREATE PROJECT] Spec content updated')
 
       // Step 4: Create tasks
-      console.log('📋 [CREATE PROJECT] Creating tasks in database...')
       const taskIdMap = new Map<string, string>()
       const tasksWithIds = planResult.data.tasks.map((task) => {
         const id = randomUUID()
@@ -98,7 +82,6 @@ export const createProject = createServerFn({ method: 'POST' })
       }))
 
       await prisma.task.createMany({ data: taskData })
-      console.log('✅ [CREATE PROJECT] Created', taskData.length, 'tasks')
 
       const createdTasks = await prisma.task.findMany({
         where: { projectId: project.id },
@@ -106,7 +89,6 @@ export const createProject = createServerFn({ method: 'POST' })
       })
 
       // Step 5: Create GitHub repository
-      console.log('🐙 [CREATE PROJECT] Creating GitHub repository...')
       const repo = await createProjectRepository({
         projectName: project.name,
         description: project.description ?? '',
@@ -115,10 +97,8 @@ export const createProject = createServerFn({ method: 'POST' })
         tasks: createdTasks,
         readmeContent: planResult.data.readmeContent,
       })
-      console.log('✅ [CREATE PROJECT] GitHub repo created:', repo.repoUrl)
 
       // Step 6: Update project status to READY
-      console.log('💾 [CREATE PROJECT] Updating project status to READY...')
       await prisma.project.update({
         where: { id: project.id },
         data: {
@@ -127,21 +107,13 @@ export const createProject = createServerFn({ method: 'POST' })
           repoName: repo.repoName,
         },
       })
-      console.log('✅ [CREATE PROJECT] Project status updated to READY')
 
-      const response: CreateProjectResponse = {
+      return {
         projectId: project.id,
         redirectUrl: `/project/${project.id}`,
       }
-
-      console.log('🎉 [CREATE PROJECT] Project creation completed successfully!')
-      console.log('📍 [CREATE PROJECT] Redirect URL:', response.redirectUrl)
-
-      return response
     } catch (error) {
-      console.error('💥 [CREATE PROJECT] ERROR during project creation:')
-      console.error('💥 [CREATE PROJECT] Error details:', error)
-      console.error('💥 [CREATE PROJECT] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      console.error('[CREATE PROJECT] Error:', error)
       throw error
     }
   })

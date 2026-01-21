@@ -54,10 +54,7 @@ type PullRequestInfo = {
   state: string
 }
 
-/**
- * GitHub provider for repository operations
- * Uses Octokit to interact with GitHub API
- */
+
 export class GitHubProvider {
   private octokit: Octokit
   private owner: string
@@ -69,9 +66,7 @@ export class GitHubProvider {
     this.owner = env.GITHUB_BOT_USERNAME
   }
 
-  /**
-   * Create a new repository from a template
-   */
+
   async createFromTemplate(
     options: CreateRepoFromTemplateOptions,
   ): Promise<RepoInfo> {
@@ -90,9 +85,6 @@ export class GitHubProvider {
         include_all_branches: false,
       })
 
-      console.log(`[GitHub] Created repo ${repoName} from template ${templateRepoName}`)
-      console.log(`[GitHub] Default branch: ${response.data.default_branch}`)
-
       return {
         name: response.data.name,
         fullName: response.data.full_name,
@@ -107,11 +99,7 @@ export class GitHubProvider {
     }
   }
 
-  /**
-   * Create initial files in a repository with a single commit
-   * This is used to add README.md, LEARNINGS.md, TASKLIST.md, etc.
-   * Handles both empty repositories and repositories with existing content.
-   */
+ 
   async createInitialFiles(
     options: CreateInitialFilesOptions,
   ): Promise<void> {
@@ -119,14 +107,11 @@ export class GitHubProvider {
       options
 
     try {
-      // Get repository info to determine default branch
       const { data: repo } = await this.octokit.rest.repos.get({
         owner: this.owner,
         repo: repoName,
       })
 
-      // GitHub's default_branch might not match where the actual code is
-      // Try common branch names to find which one has commits
       const branchesToTry = [
         repo.default_branch,
         'master',
@@ -137,7 +122,6 @@ export class GitHubProvider {
       let baseSha: string | undefined
       let baseTreeSha: string | undefined
 
-      // Try each branch to find one with commits
       for (const branch of branchesToTry) {
         try {
           const { data: ref } = await this.octokit.rest.git.getRef({
@@ -156,22 +140,15 @@ export class GitHubProvider {
 
           baseTreeSha = baseCommit.tree.sha
           defaultBranch = branch
-          
-          console.log(`[GitHub] Found existing branch with commits: ${branch} for ${repoName}`)
-          break // Found a branch with commits, use it!
-        } catch (error: any) {
-          // This branch doesn't exist or has no commits, try next one
+          break
+        } catch {
           continue
         }
       }
 
-      // If no branch was found with commits, create on 'master' (template default)
       if (!defaultBranch) {
         defaultBranch = 'master'
-        console.log(`[GitHub] No existing branches found, will create first commit on ${defaultBranch}`)
       }
-
-      console.log(`[GitHub] Using branch: ${defaultBranch} for ${repoName}`)
 
 
       // Create file tree items

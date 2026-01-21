@@ -6,6 +6,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { VoiceInput } from '@/components/landing/voice-input'
+import { Spinner } from '@/components/ui/spinner'
 
 
 
@@ -61,7 +62,9 @@ export function ChatInputBox({
           </div>
 
           <div className="flex items-center gap-2">
-            <VoiceInput />
+            <div>
+              <VoiceInput />
+            </div>
             <Button 
               size="lg" 
               onClick={onSend} 
@@ -69,7 +72,7 @@ export function ChatInputBox({
               className="px-4 rounded-full"
             >
               {isGeneratingPreview ? 'Generating...' : 'Build'}
-              <HugeiconsIcon icon={SparklesIcon} className="size-4" />
+              {isGeneratingPreview ? <Spinner /> : <HugeiconsIcon icon={SparklesIcon} className="size-4" />}
             </Button>
           </div>
         </div>
