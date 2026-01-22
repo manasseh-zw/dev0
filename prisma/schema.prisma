@@ -32,6 +32,11 @@ enum TaskStatus {
   SKIPPED     // Manually skipped by user
 }
 
+enum GeminiModel {
+  GEMINI_3_FLASH_PREVIEW @map("gemini-3-flash-preview")
+  GEMINI_3_PRO_PREVIEW   @map("gemini-3-pro-preview")
+}
+
 enum SandboxStatus {
   READY       // Sandbox is provisioned and ready
   RUNNING     // Task is executing
@@ -83,6 +88,7 @@ model Task {
   order        Int        @default(0)    // Order within phase
 
   status       TaskStatus @default(PENDING)
+  geminiModel  GeminiModel @default(GEMINI_3_PRO_PREVIEW)
 
   // Dependencies (array of task IDs that must complete first)
   dependencies String[]   @default([])

@@ -74,6 +74,7 @@ export const createProject = createServerFn({ method: 'POST' })
         description: task.description,
         phase: task.phase,
         order: task.order,
+        geminiModel: task.geminiModel,
         dependencies: task.dependencies
           .map((dependencyId) => taskIdMap.get(dependencyId))
           .filter((dependencyId): dependencyId is string =>
@@ -355,7 +356,7 @@ export const getProjectStats = createServerFn({ method: 'GET' })
   })
 
 export type ProjectStats = {
-  total: number 
+  total: number
   pending: number
   running: number
   review: number
@@ -363,3 +364,27 @@ export type ProjectStats = {
   failed: number
   skipped: number
 }
+
+type UpdateTaskModelInput = {
+  taskId: string
+  geminiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview'
+}
+
+/**
+ * Update task Gemini model
+ */
+export const updateTaskModel = createServerFn({ method: 'POST' })
+  .inputValidator(
+    z.object({
+      taskId: z.string(),
+      geminiModel: z.enum(['gemini-3-flash-preview', 'gemini-3-pro-preview']),
+    }),
+  )
+  .handler(async ({ data }: { data: UpdateTaskModelInput }) => {
+    const task = await prisma.task.update({
+      where: { id: data.taskId },
+      data: { geminiModel: data.geminiModel },
+    })
+
+    return task
+  })

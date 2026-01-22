@@ -6,6 +6,7 @@ export {
   getProjectTasks,
   getTask,
   updateTaskStatus,
+  updateTaskModel,
   updateProjectStatus,
   getProjectStats,
   type ProjectWithTasks,
