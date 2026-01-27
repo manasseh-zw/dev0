@@ -1,7 +1,8 @@
 import { getDaytonaClient } from '@/lib/sandbox/client'
 import { getTemplate } from '@/lib/templates'
 import { env } from '@/lib/env'
-import { prisma } from '@/lib/db'
+import { db } from '@/lib/db'
+import { sandboxes } from '@/lib/db/schema'
 import type {
   CreateSandboxConfig,
   SandboxInstance,
@@ -9,6 +10,7 @@ import type {
   CommandResult,
   GeminiExecOptions,
 } from '@/lib/types'
+import { eq } from 'drizzle-orm'
 
 const SNAPSHOT_NAME = 'dev0-universal'
 
@@ -40,15 +42,20 @@ export async function createSandbox(
     throw new Error(`Failed to clone template: ${cloneResult.result}`)
   }
 
-  const dbSandbox = await prisma.sandbox.create({
-    data: {
+  const [dbSandbox] = await db
+    .insert(sandboxes)
+    .values({
       daytonaId: sandbox.id,
       projectId: config.projectId,
-      taskId: config.taskId,
+      taskId: config.taskId ?? null,
       status: 'READY',
       snapshotId: SNAPSHOT_NAME,
-    },
-  })
+    })
+    .returning()
+
+  if (!dbSandbox) {
+    throw new Error('Failed to persist sandbox')
+  }
 
   return {
     id: dbSandbox.id,
@@ -64,10 +71,7 @@ export async function executeCommand(
   options?: ExecuteCommandOptions
 ): Promise<CommandResult> {
   const daytona = getDaytonaClient()
-
-  const dbSandbox = await prisma.sandbox.findUniqueOrThrow({
-    where: { id: sandboxId },
-  })
+  const dbSandbox = await getSandboxRecord(sandboxId)
 
   const sandbox = await daytona.get(dbSandbox.daytonaId)
 
@@ -114,38 +118,30 @@ export async function executeGemini(
 export async function stopSandbox(sandboxId: string): Promise<void> {
   const daytona = getDaytonaClient()
 
-  const dbSandbox = await prisma.sandbox.findUniqueOrThrow({
-    where: { id: sandboxId },
-  })
+  const dbSandbox = await getSandboxRecord(sandboxId)
 
   const sandbox = await daytona.get(dbSandbox.daytonaId)
   await daytona.stop(sandbox)
 
-  await prisma.sandbox.update({
-    where: { id: sandboxId },
-    data: { status: 'STOPPED' },
-  })
+  await db
+    .update(sandboxes)
+    .set({ status: 'STOPPED' })
+    .where(eq(sandboxes.id, sandboxId))
 }
 
 export async function deleteSandbox(sandboxId: string): Promise<void> {
   const daytona = getDaytonaClient()
 
-  const dbSandbox = await prisma.sandbox.findUniqueOrThrow({
-    where: { id: sandboxId },
-  })
+  const dbSandbox = await getSandboxRecord(sandboxId)
 
   const sandbox = await daytona.get(dbSandbox.daytonaId)
   await daytona.delete(sandbox)
 
-  await prisma.sandbox.delete({
-    where: { id: sandboxId },
-  })
+  await db.delete(sandboxes).where(eq(sandboxes.id, sandboxId))
 }
 
 export async function getSandbox(sandboxId: string): Promise<SandboxInstance> {
-  const dbSandbox = await prisma.sandbox.findUniqueOrThrow({
-    where: { id: sandboxId },
-  })
+  const dbSandbox = await getSandboxRecord(sandboxId)
 
   return {
     id: dbSandbox.id,
@@ -153,4 +149,18 @@ export async function getSandbox(sandboxId: string): Promise<SandboxInstance> {
     status: dbSandbox.status.toLowerCase() as SandboxInstance['status'],
     publicUrl: dbSandbox.publicUrl ?? undefined,
   }
+}
+
+async function getSandboxRecord(sandboxId: string) {
+  const record = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.id, sandboxId))
+    .limit(1)
+
+  if (!record[0]) {
+    throw new Error('Sandbox not found')
+  }
+
+  return record[0]
 }

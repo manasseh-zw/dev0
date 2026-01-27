@@ -36,7 +36,7 @@ function ProjectPage() {
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
           <TaskHeader />
       <main className="flex-1 w-full overflow-x-auto">
-        <TaskBoard />
+        <TaskBoard tasks={project.tasks} />
       </main>
     </div>
   )

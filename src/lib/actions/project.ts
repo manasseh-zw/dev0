@@ -1,15 +1,21 @@
 import { createServerFn } from '@tanstack/react-start'
+import { asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   generateProjectPlan,
   type PlannerOutput,
   type ProjectSpec,
 } from '@/lib/ai'
-import { prisma } from '@/lib/db'
+import { db } from '@/lib/db'
+import { projects, tasks } from '@/lib/db/schema'
 import { createProjectRepository } from '@/lib/git'
 import type { TechStack } from '@/lib/templates'
-import type { Project, Task } from 'generated/prisma/client'
 import { randomUUID } from 'crypto'
+import type { InferSelectModel } from 'drizzle-orm'
+
+type Project = InferSelectModel<typeof projects>
+type Task = InferSelectModel<typeof tasks>
+type GeminiModel = InferSelectModel<typeof tasks>['geminiModel']
 
 const createProjectSchema = z.object({
   name: z.string().min(1),
@@ -29,16 +35,21 @@ export const createProject = createServerFn({ method: 'POST' })
       const { name, description, vibeInput, techStack, theme } = data
 
       // Step 1: Create initial project
-      const project = await prisma.project.create({
-        data: {
+      const [project] = await db
+        .insert(projects)
+        .values({
           name,
           description,
           vibeInput,
           techStack,
           theme,
           status: 'PLANNING',
-        },
-      })
+        })
+        .returning()
+
+      if (!project) {
+        throw new Error('Failed to create project')
+      }
 
       // Step 2: Generate plan with AI
       const planResult = await generateProjectPlan({
@@ -54,10 +65,10 @@ export const createProject = createServerFn({ method: 'POST' })
 
       // Step 3: Update project with spec
       const specContent = buildSpecContent(planResult.data.spec)
-      await prisma.project.update({
-        where: { id: project.id },
-        data: { specContent },
-      })
+      await db
+        .update(projects)
+        .set({ specContent })
+        .where(eq(projects.id, project.id))
 
       // Step 4: Create tasks
       const taskIdMap = new Map<string, string>()
@@ -82,12 +93,13 @@ export const createProject = createServerFn({ method: 'POST' })
           ),
       }))
 
-      await prisma.task.createMany({ data: taskData })
+      await db.insert(tasks).values(taskData)
 
-      const createdTasks = await prisma.task.findMany({
-        where: { projectId: project.id },
-        orderBy: [{ phase: 'asc' }, { order: 'asc' }],
-      })
+      const createdTasks = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.projectId, project.id))
+        .orderBy(asc(tasks.phase), asc(tasks.order))
 
       // Step 5: Create GitHub repository
       const repo = await createProjectRepository({
@@ -100,14 +112,14 @@ export const createProject = createServerFn({ method: 'POST' })
       })
 
       // Step 6: Update project status to READY
-      await prisma.project.update({
-        where: { id: project.id },
-        data: {
+      await db
+        .update(projects)
+        .set({
           status: 'READY',
           repoUrl: repo.repoUrl,
           repoName: repo.repoName,
-        },
-      })
+        })
+        .where(eq(projects.id, project.id))
 
       return {
         projectId: project.id,
@@ -155,20 +167,26 @@ function buildRepoContext(plan: PlannerOutput): string {
 export const getProject = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ projectId: z.string() }))
   .handler(async ({ data }: { data: { projectId: string } }) => {
-    const project = await prisma.project.findUnique({
-      where: { id: data.projectId },
-      include: {
-        tasks: {
-          orderBy: [{ phase: 'asc' }, { order: 'asc' }],
-        },
-      },
-    })
+    const project = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, data.projectId))
+      .limit(1)
 
-    if (!project) {
+    if (!project[0]) {
       throw new Error('Project not found')
     }
 
-    return project
+    const projectTasks = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.projectId, data.projectId))
+      .orderBy(asc(tasks.phase), asc(tasks.order))
+
+    return {
+      ...project[0],
+      tasks: projectTasks,
+    }
   })
 
 export type ProjectWithTasks = Project & { tasks: Task[] }
@@ -178,16 +196,22 @@ export type ProjectWithTasks = Project & { tasks: Task[] }
  */
 export const getProjects = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const projects = await prisma.project.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { tasks: true },
-        },
-      },
-    })
+    const rows = await db
+      .select({
+        project: projects,
+        taskCount: sql<number>`
+          (select count(*)
+           from ${tasks}
+           where ${tasks.projectId} = ${projects.id})
+        `.mapWith(Number),
+      })
+      .from(projects)
+      .orderBy(desc(projects.createdAt))
 
-    return projects
+    return rows.map((row) => ({
+      ...row.project,
+      _count: { tasks: row.taskCount },
+    }))
   },
 )
 
@@ -199,12 +223,11 @@ export type ProjectWithCount = Project & { _count: { tasks: number } }
 export const getProjectTasks = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ projectId: z.string() }))
   .handler(async ({ data }: { data: { projectId: string } }) => {
-    const tasks = await prisma.task.findMany({
-      where: { projectId: data.projectId },
-      orderBy: [{ phase: 'asc' }, { order: 'asc' }],
-    })
-
-    return tasks
+    return db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.projectId, data.projectId))
+      .orderBy(asc(tasks.phase), asc(tasks.order))
   })
 
 /**
@@ -213,25 +236,34 @@ export const getProjectTasks = createServerFn({ method: 'GET' })
 export const getTask = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ taskId: z.string() }))
   .handler(async ({ data }: { data: { taskId: string } }) => {
-    const task = await prisma.task.findUnique({
-      where: { id: data.taskId },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            repoName: true,
-            repoUrl: true,
-          },
-        },
-      },
-    })
+    const rows = await db
+      .select({
+        task: tasks,
+        projectId: projects.id,
+        projectName: projects.name,
+        projectRepoName: projects.repoName,
+        projectRepoUrl: projects.repoUrl,
+      })
+      .from(tasks)
+      .leftJoin(projects, eq(tasks.projectId, projects.id))
+      .where(eq(tasks.id, data.taskId))
+      .limit(1)
 
-    if (!task) {
+    const row = rows[0]
+
+    if (!row) {
       throw new Error('Task not found')
     }
 
-    return task
+    return {
+      ...row.task,
+      project: {
+        id: row.projectId ?? '',
+        name: row.projectName ?? '',
+        repoName: row.projectRepoName ?? null,
+        repoUrl: row.projectRepoUrl ?? null,
+      },
+    }
   })
 
 type UpdateTaskStatusInput = {
@@ -261,14 +293,15 @@ export const updateTaskStatus = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }: { data: UpdateTaskStatusInput }) => {
-    const task = await prisma.task.update({
-      where: { id: data.taskId },
-      data: {
+    const [task] = await db
+      .update(tasks)
+      .set({
         status: data.status,
         prUrl: data.prUrl,
         prNumber: data.prNumber,
-      },
-    })
+      })
+      .where(eq(tasks.id, data.taskId))
+      .returning()
 
     return task
   })
@@ -296,10 +329,11 @@ export const updateProjectStatus = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }: { data: UpdateProjectStatusInput }) => {
-    const project = await prisma.project.update({
-      where: { id: data.projectId },
-      data: { status: data.status },
-    })
+    const [project] = await db
+      .update(projects)
+      .set({ status: data.status })
+      .where(eq(projects.id, data.projectId))
+      .returning()
 
     return project
   })
@@ -310,11 +344,14 @@ export const updateProjectStatus = createServerFn({ method: 'POST' })
 export const getProjectStats = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ projectId: z.string() }))
   .handler(async ({ data }: { data: { projectId: string } }) => {
-    const tasks = await prisma.task.groupBy({
-      by: ['status'],
-      where: { projectId: data.projectId },
-      _count: { status: true },
-    })
+    const groupedTasks = await db
+      .select({
+        status: tasks.status,
+        count: sql<number>`count(*)`.mapWith(Number),
+      })
+      .from(tasks)
+      .where(eq(tasks.projectId, data.projectId))
+      .groupBy(tasks.status)
 
     const stats = {
       total: 0,
@@ -326,8 +363,8 @@ export const getProjectStats = createServerFn({ method: 'GET' })
       skipped: 0,
     }
 
-    for (const group of tasks) {
-      const count = group._count.status
+    for (const group of groupedTasks) {
+      const count = group.count
       stats.total += count
 
       switch (group.status) {
@@ -367,7 +404,7 @@ export type ProjectStats = {
 
 type UpdateTaskModelInput = {
   taskId: string
-  geminiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview'
+  geminiModel: GeminiModel
 }
 
 /**
@@ -381,10 +418,11 @@ export const updateTaskModel = createServerFn({ method: 'POST' })
     }),
   )
   .handler(async ({ data }: { data: UpdateTaskModelInput }) => {
-    const task = await prisma.task.update({
-      where: { id: data.taskId },
-      data: { geminiModel: data.geminiModel },
-    })
+    const [task] = await db
+      .update(tasks)
+      .set({ geminiModel: data.geminiModel })
+      .where(eq(tasks.id, data.taskId))
+      .returning()
 
     return task
   })

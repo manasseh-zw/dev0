@@ -1,7 +1,8 @@
-import type { Task as PrismaTask, TaskStatus } from 'generated/prisma/client'
+import type { InferSelectModel } from 'drizzle-orm'
+import { taskStatusEnum, tasks } from '@/lib/db/schema'
 
-export type Task = PrismaTask
-export type { TaskStatus }
+export type Task = InferSelectModel<typeof tasks>
+export type TaskStatus = (typeof taskStatusEnum.enumValues)[number]
 
 export type CreateTaskData = {
   projectId: string

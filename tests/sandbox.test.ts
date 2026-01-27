@@ -5,10 +5,13 @@ import {
   executeGemini,
   deleteSandbox,
 } from '@/lib/sandbox'
-import { prisma } from '@/lib/db'
+import { db } from '@/lib/db'
+import { projects } from '@/lib/db/schema'
 import type { TechStack } from '@/lib/templates'
+import { eq } from 'drizzle-orm'
+import { randomUUID } from 'crypto'
 
-const TEST_PROJECT_ID = `test-project-${Date.now()}`
+const TEST_PROJECT_ID = randomUUID()
 const TEST_TECH_STACK: TechStack = 'tanstack-start'
 
 let sandboxId: string | null = null
@@ -17,14 +20,12 @@ describe('Sandbox Integration Test (Live)', () => {
   beforeAll(async () => {
     console.log('\n🧪 Starting Sandbox Integration Tests...\n')
 
-    await prisma.project.create({
-      data: {
-        id: TEST_PROJECT_ID,
-        name: 'Test Todo App',
-        description: 'Integration test project',
-        techStack: TEST_TECH_STACK,
-        status: 'PLANNING',
-      },
+    await db.insert(projects).values({
+      id: TEST_PROJECT_ID,
+      name: 'Test Todo App',
+      description: 'Integration test project',
+      techStack: TEST_TECH_STACK,
+      status: 'PLANNING',
     })
     console.log(`✅ Created test project: ${TEST_PROJECT_ID}`)
   })
@@ -40,13 +41,11 @@ describe('Sandbox Integration Test (Live)', () => {
     }
 
     try {
-      await prisma.project.delete({ where: { id: TEST_PROJECT_ID } })
+      await db.delete(projects).where(eq(projects.id, TEST_PROJECT_ID))
       console.log(`✅ Cleaned up test project`)
     } catch (error) {
       console.warn(`⚠️  Failed to clean up project: ${error}`)
     }
-
-    await prisma.$disconnect()
     console.log('\n✅ Tests complete!\n')
   })
 

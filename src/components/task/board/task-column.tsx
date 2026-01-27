@@ -1,7 +1,7 @@
 "use client";
 
+import type { Task } from "@/lib/types";
 import { Status } from "@/components/task/mock-data/statuses";
-import { Task } from "@/components/task/mock-data/tasks";
 import { TaskCard } from "./task-card";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
@@ -11,9 +11,13 @@ import { Button } from "@/components/ui/button";
 interface TaskColumnProps {
   status: Status;
   tasks: Task[];
+  onModelChange?: (
+    taskId: string,
+    model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
+  ) => void;
 }
 
-export function TaskColumn({ status, tasks }: TaskColumnProps) {
+export function TaskColumn({ status, tasks, onModelChange }: TaskColumnProps) {
   const StatusIcon = status.icon;
 
   return (
@@ -38,7 +42,12 @@ export function TaskColumn({ status, tasks }: TaskColumnProps) {
 
         <div className="flex flex-col gap-3 overflow-y-auto h-full">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              status={status}
+              onModelChange={onModelChange}
+            />
           ))}
 
           <Button

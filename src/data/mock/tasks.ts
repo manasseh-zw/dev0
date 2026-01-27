@@ -1,4 +1,4 @@
-import type { Task } from 'generated/prisma/client'
+import type { Task } from '@/lib/types/task'
 
 export const MOCK_TASK_IDS = {
   // Phase 1: Foundation
