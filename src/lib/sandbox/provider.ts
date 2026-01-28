@@ -198,9 +198,11 @@ export async function executeCommandStreaming(
     )
     const exitCode =
       (commandInfo as { exitCode?: number }).exitCode ??
-      (commandInfo as { exit_code?: number }).exit_code ??
-      response.exitCode ??
-      0
+      (commandInfo as { exit_code?: number }).exit_code
+
+    if (typeof exitCode !== 'number') {
+      throw new Error('Failed to retrieve session command exit code')
+    }
 
     options?.onComplete?.(exitCode)
 
