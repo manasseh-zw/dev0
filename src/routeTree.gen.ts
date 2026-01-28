@@ -13,6 +13,7 @@ import { Route as ProjectRouteImport } from './routes/project'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectProjectIdRouteImport } from './routes/project/$projectId'
+import { Route as ApiEventsProjectIdRouteImport } from './routes/api/events/$projectId'
 
 const ProjectRoute = ProjectRouteImport.update({
   id: '/project',
@@ -34,18 +35,25 @@ const ProjectProjectIdRoute = ProjectProjectIdRouteImport.update({
   path: '/$projectId',
   getParentRoute: () => ProjectRoute,
 } as any)
+const ApiEventsProjectIdRoute = ApiEventsProjectIdRouteImport.update({
+  id: '/api/events/$projectId',
+  path: '/api/events/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
   '/project/$projectId': typeof ProjectProjectIdRoute
+  '/api/events/$projectId': typeof ApiEventsProjectIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
   '/project/$projectId': typeof ProjectProjectIdRoute
+  '/api/events/$projectId': typeof ApiEventsProjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,19 +61,37 @@ export interface FileRoutesById {
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
   '/project/$projectId': typeof ProjectProjectIdRoute
+  '/api/events/$projectId': typeof ApiEventsProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/new' | '/project' | '/project/$projectId'
+  fullPaths:
+    | '/'
+    | '/new'
+    | '/project'
+    | '/project/$projectId'
+    | '/api/events/$projectId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/project' | '/project/$projectId'
-  id: '__root__' | '/' | '/new' | '/project' | '/project/$projectId'
+  to:
+    | '/'
+    | '/new'
+    | '/project'
+    | '/project/$projectId'
+    | '/api/events/$projectId'
+  id:
+    | '__root__'
+    | '/'
+    | '/new'
+    | '/project'
+    | '/project/$projectId'
+    | '/api/events/$projectId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
   ProjectRoute: typeof ProjectRouteWithChildren
+  ApiEventsProjectIdRoute: typeof ApiEventsProjectIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -98,6 +124,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectProjectIdRouteImport
       parentRoute: typeof ProjectRoute
     }
+    '/api/events/$projectId': {
+      id: '/api/events/$projectId'
+      path: '/api/events/$projectId'
+      fullPath: '/api/events/$projectId'
+      preLoaderRoute: typeof ApiEventsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -116,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
   ProjectRoute: ProjectRouteWithChildren,
+  ApiEventsProjectIdRoute: ApiEventsProjectIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
