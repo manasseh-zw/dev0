@@ -20,6 +20,14 @@ export type ExecuteCommandOptions = {
   onOutput?: (data: string) => void
 }
 
+export type StreamingCallbacks = {
+  onStdout?: (data: string) => void
+  onStderr?: (data: string) => void
+  onComplete?: (exitCode: number) => void
+}
+
+export type StreamingCommandOptions = ExecuteCommandOptions & StreamingCallbacks
+
 export type CommandResult = {
   exitCode: number
   stdout: string
