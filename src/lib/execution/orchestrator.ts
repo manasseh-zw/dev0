@@ -51,31 +51,66 @@ export async function startTask(
   })
 
   try {
-    const task = taskId
-      ? await getTaskById(projectId, taskId)
-      : await getNextRunnableTask(projectId)
+    let task: Task | null = null
 
-    if (!task) {
-      throw new Error('No runnable task found for this project')
-    }
+    if (taskId) {
+      task = await getTaskById(projectId, taskId)
+      const updated = await claimPendingTask(task.id)
+      if (!updated) {
+        const status = await getTaskStatus(task.id)
+        const runningTaskId = await getRunningTaskId(projectId)
+        projectState.set(projectId, {
+          runningTaskId: runningTaskId ?? null,
+          sandboxId: null,
+          starting: false,
+        })
+        if (runningTaskId) {
+          return {
+            taskId: runningTaskId,
+            sandboxId: '',
+            alreadyRunning: true,
+          }
+        }
+        throw new Error(`Task is not pending (status: ${status ?? 'unknown'})`)
+      }
+    } else {
+      let lastFailedTaskId: string | null = null
+      let lastFailedStatus: Task['status'] | null = null
 
-    const updated = await db
-      .update(tasks)
-      .set({ status: 'RUNNING' })
-      .where(and(eq(tasks.id, task.id), eq(tasks.status, 'PENDING')))
-      .returning()
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        task = await getNextRunnableTask(projectId)
+        if (!task) {
+          throw new Error('No runnable task found for this project')
+        }
+        const updated = await claimPendingTask(task.id)
+        if (updated) {
+          break
+        }
+        lastFailedTaskId = task.id
+        lastFailedStatus = await getTaskStatus(task.id)
+        task = null
+      }
 
-    if (!updated[0]) {
-      const runningTaskId = await getRunningTaskId(projectId)
-      projectState.set(projectId, {
-        runningTaskId: runningTaskId ?? null,
-        sandboxId: null,
-        starting: false,
-      })
-      return {
-        taskId: runningTaskId ?? task.id,
-        sandboxId: '',
-        alreadyRunning: true,
+      if (!task) {
+        const runningTaskId = await getRunningTaskId(projectId)
+        projectState.set(projectId, {
+          runningTaskId: runningTaskId ?? null,
+          sandboxId: null,
+          starting: false,
+        })
+        if (runningTaskId) {
+          return {
+            taskId: runningTaskId,
+            sandboxId: '',
+            alreadyRunning: true,
+          }
+        }
+        if (lastFailedTaskId) {
+          throw new Error(
+            `Unable to claim task ${lastFailedTaskId} (status: ${lastFailedStatus ?? 'unknown'})`,
+          )
+        }
+        throw new Error('Unable to claim a runnable task')
       }
     }
 
@@ -376,4 +411,24 @@ async function getRunningTaskId(projectId: string): Promise<string | null> {
     .limit(1)
 
   return record[0]?.id ?? null
+}
+
+async function getTaskStatus(taskId: string): Promise<Task['status'] | null> {
+  const record = await db
+    .select({ status: tasks.status })
+    .from(tasks)
+    .where(eq(tasks.id, taskId))
+    .limit(1)
+
+  return record[0]?.status ?? null
+}
+
+async function claimPendingTask(taskId: string): Promise<boolean> {
+  const updated = await db
+    .update(tasks)
+    .set({ status: 'RUNNING' })
+    .where(and(eq(tasks.id, taskId), eq(tasks.status, 'PENDING')))
+    .returning()
+
+  return Boolean(updated[0])
 }
