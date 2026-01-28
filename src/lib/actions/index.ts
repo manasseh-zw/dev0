@@ -17,5 +17,8 @@ export {
 // Preview Action
 export { getPreview, type PreviewOutput } from './preview'
 
+// Transcription Action
+export { transcribe } from './transcribe'
+
 // Execution Actions
 export { startExecution, stopExecution } from './execution'

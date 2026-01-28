@@ -59,7 +59,17 @@ export function ChatInputBox({
 
           <div className="flex items-center gap-2">
             <div>
-              <VoiceInput />
+              <VoiceInput
+                onTranscription={(text) => {
+                  const cleaned = text.trim()
+                  if (!cleaned) {
+                    return
+                  }
+
+                  const prefix = message.trim().length ? ' ' : ''
+                  onMessageChange(`${message}${prefix}${cleaned}`)
+                }}
+              />
             </div>
             <motion.div
               layout

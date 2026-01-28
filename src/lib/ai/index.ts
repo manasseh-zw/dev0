@@ -1,10 +1,20 @@
-
 export {
   generatePreview,
   PREVIEW_MODEL,
   type PreviewAgentInput,
   type PreviewAgentResult,
 } from './preview-agent'
+
+// Transcription
+export {
+  transcribeAudio,
+  TRANSCRIBE_MODEL,
+  type TranscribeInput,
+  type TranscribeResult,
+} from './transcribe'
+
+// Models
+export { GEMINI_3_FLASH, GEMINI_3_PRO, type GeminiModelId } from './models'
 
 // Planner Agent
 export {

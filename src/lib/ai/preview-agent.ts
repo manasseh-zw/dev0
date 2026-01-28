@@ -1,9 +1,9 @@
 import { google } from '@ai-sdk/google'
 import { generateText, Output } from 'ai'
 import { previewOutputSchema, type PreviewOutput } from './schemas'
+import { GEMINI_3_FLASH } from './models'
 
-
-const PREVIEW_MODEL = 'gemini-3-flash-preview'
+const PREVIEW_MODEL = GEMINI_3_FLASH
 
 const PREVIEW_SYSTEM_PROMPT = `You are a technical product strategist and naming expert. Your job is to take a user's rough "vibe" or idea for a software project and extract:
 
@@ -37,7 +37,6 @@ type PreviewAgentResult =
       success: false
       error: string
     }
-
 
 export async function generatePreview(
   input: PreviewAgentInput,

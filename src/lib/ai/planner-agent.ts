@@ -6,9 +6,9 @@ import {
   type PlannedTask,
 } from './schemas'
 import type { TechStack } from '@/lib/templates'
+import { GEMINI_3_PRO } from './models'
 
-
-const PLANNER_MODEL = 'gemini-3-pro-preview'
+const PLANNER_MODEL = GEMINI_3_PRO
 
 const PLANNER_SYSTEM_PROMPT = `You are a senior technical architect and project planner. Your job is to take a project idea and create a complete, actionable project plan.
 
@@ -78,7 +78,6 @@ type PlannerAgentResult =
       error: string
     }
 
-
 export async function generateProjectPlan(
   input: PlannerAgentInput,
 ): Promise<PlannerAgentResult> {
@@ -134,7 +133,6 @@ Please generate a complete project plan with:
     }
   }
 }
-
 
 function normalizePlannedTasks(tasks: PlannedTask[]): PlannedTask[] {
   const idMap = new Map<string, string>()
