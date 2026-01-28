@@ -2,6 +2,7 @@
 
 import { ChatWelcomeScreen } from '@/components/landing'
 import { GridPattern } from '@/components/ui/grid-pattern'
+import { ThemeSwitcher } from '@/components/theme-switcher'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useStore } from '@tanstack/react-store'
 import { getPreview } from '@/lib/actions'
@@ -12,7 +13,10 @@ export const Route = createFileRoute('/')({ component: App })
 function App() {
   const navigate = useNavigate()
   const message = useStore(appStore, (state) => state.vibeInput)
-  const isGeneratingPreview = useStore(appStore, (state) => state.isGeneratingPreview)
+  const isGeneratingPreview = useStore(
+    appStore,
+    (state) => state.isGeneratingPreview,
+  )
 
   const handleSend = async () => {
     if (!message.trim()) {
@@ -21,11 +25,11 @@ function App() {
 
     try {
       appActions.setGeneratingPreview(true)
-      
+
       const previewData = await getPreview({ data: { vibeInput: message } })
-      
+
       appActions.setPreviewData(previewData)
-      
+
       navigate({ to: '/new' })
     } catch (error) {
       console.error('Error generating preview:', error)
@@ -41,6 +45,9 @@ function App() {
         <GridPattern className="pointer-events-none" />
 
         <div className="relative z-10 h-full">
+          <div className="absolute right-4 top-4">
+            <ThemeSwitcher />
+          </div>
           <ChatWelcomeScreen
             message={message}
             onMessageChange={appActions.setVibeInput}

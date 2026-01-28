@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { ThemeSwitcher } from '@/components/theme-switcher'
 import { appStore, appActions } from '@/lib/state'
 import { createProject } from '@/lib/actions'
 import { useEffect } from 'react'
@@ -41,7 +42,10 @@ function NewProjectPage() {
   const navigate = useNavigate()
   const previewData = useStore(appStore, (state) => state.previewData)
   const vibeInput = useStore(appStore, (state) => state.vibeInput)
-  const isCreatingProject = useStore(appStore, (state) => state.isCreatingProject)
+  const isCreatingProject = useStore(
+    appStore,
+    (state) => state.isCreatingProject,
+  )
 
   useEffect(() => {
     if (!previewData) {
@@ -52,24 +56,29 @@ function NewProjectPage() {
   const form = useForm({
     defaultValues: {
       projectName: previewData?.name || 'My Awesome Project',
-      description: previewData?.description || 'A modern web application built with the latest technologies.',
+      description:
+        previewData?.description ||
+        'A modern web application built with the latest technologies.',
       techStack: previewData?.suggestedTechStack || 'nextjs',
     },
     onSubmit: async ({ value }) => {
       try {
         appActions.setCreatingProject(true)
-        
+
         const result = await createProject({
           data: {
             name: value.projectName,
             description: value.description,
             vibeInput,
-            techStack: value.techStack as 'tanstack-start' | 'react-vite' | 'nextjs',
+            techStack: value.techStack as
+              | 'tanstack-start'
+              | 'react-vite'
+              | 'nextjs',
           },
         })
-        
+
         appActions.setCurrentProjectId(result.projectId)
-        
+
         navigate({ to: result.redirectUrl })
       } catch (error) {
         console.error('Error creating project:', error)
@@ -80,7 +89,10 @@ function NewProjectPage() {
   })
 
   return (
-    <main className="min-h-screen w-screen bg-background overflow-auto flex items-center">
+    <main className="min-h-screen w-screen bg-background overflow-auto flex items-center relative">
+      <div className="absolute right-4 top-4">
+        <ThemeSwitcher />
+      </div>
       <div className="mx-auto flex max-w-3xl items-center justify-center p-10">
         <form
           onSubmit={(e) => {
@@ -222,9 +234,9 @@ function NewProjectPage() {
 
           {/* Submit Button */}
           <div className="flex items-center justify-end">
-            <Button 
-              type="submit" 
-              size="lg" 
+            <Button
+              type="submit"
+              size="lg"
               className="px-8"
               disabled={isCreatingProject}
             >

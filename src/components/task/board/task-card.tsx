@@ -146,8 +146,8 @@ export function TaskCard({ task, status, onModelChange }: TaskCardProps) {
                     value={attemptProgress}
                     strokeWidth={12}
                     styles={buildStyles({
-                      pathColor: '#10b981',
-                      trailColor: '#EDEDED',
+                      pathColor: 'var(--color-primary)',
+                      trailColor: 'var(--color-muted)',
                       strokeLinecap: 'round',
                     })}
                   />
