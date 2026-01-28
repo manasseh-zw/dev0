@@ -1,4 +1,3 @@
-
 import type { TechStack } from '@/lib/templates'
 
 export type CreateProjectRequest = {
@@ -31,7 +30,6 @@ export type ProjectDetailsResponse = {
   completedTaskCount: number
 }
 
-
 export type TaskListResponse = {
   tasks: TaskSummary[]
   phases: number[]
@@ -50,14 +48,21 @@ export type TaskSummary = {
 }
 
 export type StartExecutionRequest = {
+  projectId: string
   taskId?: string
 }
 
-export type StartExecutionResponse = {
-  taskId: string
-  sandboxId: string
-  message: string
-}
+export type StartExecutionResponse =
+  | {
+      success: true
+      taskId: string
+      sandboxId: string
+    }
+  | {
+      success: false
+      message: string
+      runningTaskId?: string
+    }
 
 export type TaskStatusUpdateRequest = {
   status: 'running' | 'review' | 'done' | 'failed'
@@ -98,7 +103,6 @@ export type ApiError = {
   code?: string
   details?: Record<string, unknown>
 }
-
 
 export type PaginationParams = {
   page?: number
