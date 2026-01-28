@@ -48,12 +48,6 @@ export function VoiceInput({
     <div className={cn('flex flex-col items-center justify-center', className)}>
       <motion.div
         className="flex p-2 border items-center justify-center rounded-full cursor-pointer"
-        layout
-        transition={{
-          layout: {
-            duration: 0.4,
-          },
-        }}
         onClick={onClickHandler}
       >
         <div className="h-4 w-4 items-center justify-center flex ">
