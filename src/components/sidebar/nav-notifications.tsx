@@ -1,7 +1,7 @@
-"use client";
+'use client'
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,25 +9,37 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { BellIcon } from "lucide-react";
+} from '@/components/ui/dropdown-menu'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Notification01Icon } from '@hugeicons/core-free-icons'
 
 type Notification = {
-  id: string;
-  avatar: string;
-  fallback: string;
-  text: string;
-  time: string;
-};
+  id: string
+  avatar: string
+  fallback: string
+  text: string
+  time: string
+}
 
 export function NotificationsPopover({
   notifications,
 }: {
-  notifications: Notification[];
+  notifications: Notification[]
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" aria-label="Open notifications" />}><BellIcon className="size-5" /></DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            aria-label="Open notifications"
+          />
+        }
+      >
+        <HugeiconsIcon icon={Notification01Icon} className="size-5" />
+      </DropdownMenuTrigger>
       <DropdownMenuContent side="right" className="w-80 my-6">
         <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -49,5 +61,5 @@ export function NotificationsPopover({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
+  )
 }

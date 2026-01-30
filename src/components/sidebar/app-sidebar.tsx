@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import {
   Sidebar,
@@ -7,209 +7,104 @@ import {
   SidebarHeader,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+} from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils'
+import { motion } from 'motion/react'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  Activity,
-  DollarSign,
-  Home,
-  Infinity,
-  LinkIcon,
-  Package2,
-  Percent,
-  PieChart,
-  Settings,
-  ShoppingBag,
-  Sparkles,
-  Store,
-  TrendingUp,
-  Users,
-} from "lucide-react";
-import { Logo } from "@/components/sidebar/logo";
-import type { Route } from "./nav-main";
-import DashboardNavigation from "@/components/sidebar/nav-main";
-import { NotificationsPopover } from "@/components/sidebar/nav-notifications";
-import { TeamSwitcher } from "@/components/sidebar/team-switcher";
-
-const sampleNotifications = [
-  {
-    id: "1",
-    avatar: "/avatars/01.png",
-    fallback: "OM",
-    text: "New order received.",
-    time: "10m ago",
-  },
-  {
-    id: "2",
-    avatar: "/avatars/02.png",
-    fallback: "JL",
-    text: "Server upgrade completed.",
-    time: "1h ago",
-  },
-  {
-    id: "3",
-    avatar: "/avatars/03.png",
-    fallback: "HH",
-    text: "New user signed up.",
-    time: "2h ago",
-  },
-];
+  ChatPreviewIcon,
+  DashboardSquare01Icon,
+  GitPullRequestIcon,
+  Settings01Icon,
+} from '@hugeicons/core-free-icons'
+import { Logo, LogoIcon } from '@/components/logo'
+import type { Route } from './nav-main'
+import DashboardNavigation from '@/components/sidebar/nav-main'
+import { TeamSwitcher } from '@/components/sidebar/team-switcher'
 
 const dashboardRoutes: Route[] = [
   {
-    id: "home",
-    title: "Home",
-    icon: <Home className="size-4" />,
-    link: "#",
+    id: 'dashboard',
+    title: 'Dashboard',
+    icon: <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4" />,
+    link: '/project',
   },
   {
-    id: "products",
-    title: "Products",
-    icon: <Package2 className="size-4" />,
-    link: "#",
-    subs: [
-      {
-        title: "Catalogue",
-        link: "#",
-        icon: <Package2 className="size-4" />,
-      },
-      {
-        title: "Checkout Links",
-        link: "#",
-        icon: <LinkIcon className="size-4" />,
-      },
-      {
-        title: "Discounts",
-        link: "#",
-        icon: <Percent className="size-4" />,
-      },
-    ],
+    id: 'review',
+    title: 'Review',
+    icon: <HugeiconsIcon icon={GitPullRequestIcon} className="size-4" />,
+    link: '#',
   },
   {
-    id: "usage-billing",
-    title: "Usage Billing",
-    icon: <PieChart className="size-4" />,
-    link: "#",
-    subs: [
-      {
-        title: "Meters",
-        link: "#",
-        icon: <PieChart className="size-4" />,
-      },
-      {
-        title: "Events",
-        link: "#",
-        icon: <Activity className="size-4" />,
-      },
-    ],
+    id: 'preview',
+    title: 'Preview',
+    icon: <HugeiconsIcon icon={ChatPreviewIcon} className="size-4" />,
+    link: '#',
   },
   {
-    id: "benefits",
-    title: "Benefits",
-    icon: <Sparkles className="size-4" />,
-    link: "#",
+    id: 'settings',
+    title: 'Settings',
+    icon: <HugeiconsIcon icon={Settings01Icon} className="size-4" />,
+    link: '#',
   },
-  {
-    id: "customers",
-    title: "Customers",
-    icon: <Users className="size-4" />,
-    link: "#",
-  },
-  {
-    id: "sales",
-    title: "Sales",
-    icon: <ShoppingBag className="size-4" />,
-    link: "#",
-    subs: [
-      {
-        title: "Orders",
-        link: "#",
-        icon: <ShoppingBag className="size-4" />,
-      },
-      {
-        title: "Subscriptions",
-        link: "#",
-        icon: <Infinity className="size-4" />,
-      },
-    ],
-  },
-  {
-    id: "storefront",
-    title: "Storefront",
-    icon: <Store className="size-4" />,
-    link: "#",
-  },
-  {
-    id: "analytics",
-    title: "Analytics",
-    icon: <TrendingUp className="size-4" />,
-    link: "#",
-  },
-  {
-    id: "finance",
-    title: "Finance",
-    icon: <DollarSign className="size-4" />,
-    link: "#",
-    subs: [
-      { title: "Incoming", link: "#" },
-      { title: "Outgoing", link: "#" },
-      { title: "Payout Account", link: "#" },
-    ],
-  },
-  {
-    id: "settings",
-    title: "Settings",
-    icon: <Settings className="size-4" />,
-    link: "#",
-    subs: [
-      { title: "General", link: "#" },
-      { title: "Webhooks", link: "#" },
-      { title: "Custom Fields", link: "#" },
-    ],
-  },
-];
+]
 
 const teams = [
-  { id: "1", name: "Alpha Inc.", logo: Logo, plan: "Free" },
-  { id: "2", name: "Beta Corp.", logo: Logo, plan: "Free" },
-  { id: "3", name: "Gamma Tech", logo: Logo, plan: "Free" },
-];
+  {
+    id: '1',
+    name: 'Mission Control',
+    plan: 'Primary project',
+    initials: 'MC',
+    gradient: 'from-orange-400 to-rose-500',
+  },
+  {
+    id: '2',
+    name: 'Agent Reviews',
+    plan: 'Secondary project',
+    initials: 'AR',
+    gradient: 'from-sky-400 to-indigo-500',
+  },
+  {
+    id: '3',
+    name: 'Preview Lab',
+    plan: 'Sandbox project',
+    initials: 'PL',
+    gradient: 'from-emerald-400 to-teal-500',
+  },
+]
 
 export function DashboardSidebar() {
-  const { state } = useSidebar();
-  const isCollapsed = state === "collapsed";
+  const { state } = useSidebar()
+  const isCollapsed = state === 'collapsed'
 
   return (
     <Sidebar variant="inset" collapsible="icon">
       <SidebarHeader
         className={cn(
-          "flex md:pt-3.5",
+          'flex md:pt-3.5',
           isCollapsed
-            ? "flex-row items-center justify-between gap-y-4 md:flex-col md:items-start md:justify-start"
-            : "flex-row items-center justify-between"
+            ? 'flex-row items-center justify-between gap-y-4 md:flex-col md:items-start md:justify-start'
+            : 'flex-row items-center justify-between',
         )}
       >
         <a href="#" className="flex items-center gap-2">
-          <Logo className="h-8 w-8" />
-          {!isCollapsed && (
-            <span className="font-semibold text-black dark:text-white">
-              Acme
-            </span>
+          {isCollapsed ? (
+            <LogoIcon className="h-5 w-7" />
+          ) : (
+            <Logo height={20} className="text-foreground" />
           )}
         </a>
 
         <motion.div
-          key={isCollapsed ? "header-collapsed" : "header-expanded"}
+          key={isCollapsed ? 'header-collapsed' : 'header-expanded'}
           className={cn(
-            "flex items-center gap-2",
-            isCollapsed ? "flex-row md:flex-col-reverse" : "flex-row"
+            'flex items-center gap-2',
+            isCollapsed ? 'flex-row md:flex-col-reverse' : 'flex-row',
           )}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8 }}
         >
-          <NotificationsPopover notifications={sampleNotifications} />
           <SidebarTrigger />
         </motion.div>
       </SidebarHeader>
@@ -220,5 +115,5 @@ export function DashboardSidebar() {
         <TeamSwitcher teams={teams} />
       </SidebarFooter>
     </Sidebar>
-  );
+  )
 }
