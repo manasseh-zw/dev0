@@ -25,10 +25,12 @@ import 'react-circular-progressbar/dist/styles.css'
 interface TaskCardProps {
   task: Task
   status: Status
+  allTasks?: Task[]
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
   ) => void
+  onStartTask?: (taskId: string) => void
 }
 
 const modelOptions = [
@@ -44,12 +46,18 @@ const modelOptions = [
   },
 ] as const
 
-export function TaskCard({ task, status, onModelChange }: TaskCardProps) {
+export function TaskCard({ task, status, allTasks = [], onModelChange, onStartTask }: TaskCardProps) {
   const StatusIcon = status.icon
   const isCompleted = task.status === 'DONE'
   const isFailed = task.status === 'FAILED'
   const isPending = task.status === 'PENDING'
-  const isBlocked = isPending && task.dependencies.length > 0
+  
+  // Check if any dependency is NOT completed (DONE status)
+  const hasUnmetDependencies = task.dependencies.length > 0 && task.dependencies.some((depId) => {
+    const depTask = allTasks.find((t) => t.id === depId)
+    return !depTask || depTask.status !== 'DONE'
+  })
+  const isBlocked = isPending && hasUnmetDependencies
   const hasPr = Boolean(task.prUrl)
   const hasAttempts = task.maxAttempts > 0
   const attemptProgress = hasAttempts
@@ -164,6 +172,7 @@ export function TaskCard({ task, status, onModelChange }: TaskCardProps) {
               size="sm"
               className="px-2 text-[10px] gap-1"
               disabled={isBlocked}
+              onClick={() => onStartTask?.(task.id)}
             >
               <HugeiconsIcon icon={PlayIcon} className="size-3" />
               Start

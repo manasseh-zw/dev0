@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { LayoutGroup } from 'motion/react';
 import type { Task, TaskStatus } from '@/lib/types';
-import { updateTaskModel } from '@/lib/actions';
+import { updateTaskModel, startExecution } from '@/lib/actions';
 import { statuses } from '@/components/task/mock-data/statuses';
 import { TaskColumn } from './task-column';
 
@@ -54,34 +55,84 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
     [items],
   );
 
+  // Handle starting a task
+  const handleStartTask = React.useCallback(async (taskId: string) => {
+    const task = items.find((t) => t.id === taskId);
+    if (!task) return;
+
+    // Optimistically update UI to RUNNING
+    setItems((current) =>
+      current.map((t) =>
+        t.id === taskId ? { ...t, status: 'RUNNING' as TaskStatus, attempts: 1 } : t,
+      ),
+    );
+
+    // For mock projects, simulate agent completing work after 3 seconds
+    if (task.projectId === 'mock') {
+      setTimeout(() => {
+        setItems((current) =>
+          current.map((t) =>
+            t.id === taskId ? { ...t, status: 'REVIEW' as TaskStatus } : t,
+          ),
+        );
+      }, 3000);
+      return;
+    }
+
+    // For real projects, call the execution API
+    try {
+      const result = await startExecution({ data: { projectId: task.projectId, taskId } });
+      if (!result.success) {
+        // Revert optimistic update on failure
+        console.error('Failed to start task:', result.message);
+        setItems((current) =>
+          current.map((t) =>
+            t.id === taskId ? { ...t, status: 'PENDING' as TaskStatus, attempts: 0 } : t,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error('Failed to start task:', error);
+      // Revert optimistic update on error
+      setItems((current) =>
+        current.map((t) =>
+          t.id === taskId ? { ...t, status: 'PENDING' as TaskStatus, attempts: 0 } : t,
+        ),
+      );
+    }
+  }, [items]);
+
   return (
-    <div className="flex h-full gap-3 px-3 pt-4 pb-2 min-w-max overflow-hidden">
-      {statuses.map((status) => (
-        <TaskColumn
-          key={status.id}
-          status={status}
-          tasks={tasksByStatus[status.id] || []}
-          onModelChange={handleModelChange}
-        />
-      ))}
-    </div>
+    <LayoutGroup>
+      <div className="flex h-full gap-3 px-3 pt-4 pb-2 min-w-max overflow-hidden">
+        {statuses.map((status) => (
+          <TaskColumn
+            key={status.id}
+            status={status}
+            tasks={tasksByStatus[status.id] || []}
+            allTasks={items}
+            onModelChange={handleModelChange}
+            onStartTask={handleStartTask}
+          />
+        ))}
+      </div>
+    </LayoutGroup>
   );
 }
 
 function groupTasksByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
-  return tasks.reduce(
-    (acc, task) => {
-      acc[task.status].push(task);
-      return acc;
-    },
-    {
-      PENDING: [],
-      RUNNING: [],
-      REVIEW: [],
-      DONE: [],
-      FAILED: [],
-      SKIPPED: [],
-    },
-  );
+  const initial: Record<TaskStatus, Task[]> = {
+    PENDING: [],
+    RUNNING: [],
+    REVIEW: [],
+    DONE: [],
+    FAILED: [],
+    SKIPPED: [],
+  };
+  
+  return tasks.reduce((acc, task) => {
+    acc[task.status].push(task);
+    return acc;
+  }, initial);
 }
 

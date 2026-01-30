@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import type { Task } from "@/lib/types";
 import { Status } from "@/components/task/mock-data/statuses";
 import { TaskCard } from "./task-card";
@@ -11,13 +12,15 @@ import { Button } from "@/components/ui/button";
 interface TaskColumnProps {
   status: Status;
   tasks: Task[];
+  allTasks: Task[];
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
   ) => void;
+  onStartTask?: (taskId: string) => void;
 }
 
-export function TaskColumn({ status, tasks, onModelChange }: TaskColumnProps) {
+export function TaskColumn({ status, tasks, allTasks, onModelChange, onStartTask }: TaskColumnProps) {
   const StatusIcon = status.icon;
 
   return (
@@ -41,14 +44,32 @@ export function TaskColumn({ status, tasks, onModelChange }: TaskColumnProps) {
         </div>
 
         <div className="flex flex-col gap-3 overflow-y-auto h-full">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              status={status}
-              onModelChange={onModelChange}
-            />
-          ))}
+          <AnimatePresence mode="popLayout">
+            {tasks.map((task) => (
+              <motion.div
+                key={task.id}
+                layoutId={task.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 20,
+                  mass: 1,
+                  opacity: { duration: 0.3 },
+                }}
+              >
+                <TaskCard
+                  task={task}
+                  status={status}
+                  allTasks={allTasks}
+                  onModelChange={onModelChange}
+                  onStartTask={onStartTask}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
           <Button
             variant="ghost"
@@ -63,4 +84,5 @@ export function TaskColumn({ status, tasks, onModelChange }: TaskColumnProps) {
     </div>
   );
 }
+
 

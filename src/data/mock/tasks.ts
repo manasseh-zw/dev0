@@ -20,6 +20,10 @@ export const MOCK_TASK_IDS = {
   animations: 'task-010-animations',
   seoOptimization: 'task-011-seo-optimization',
   performanceAudit: 'task-012-performance-audit',
+
+  // Demo Tasks (no dependencies - for testing animations)
+  demoApiEndpoints: 'task-demo-api-endpoints',
+  demoUnitTests: 'task-demo-unit-tests',
 } as const
 
 const PROJECT_ID = 'mock'
@@ -39,7 +43,7 @@ const rawTasks = [
     dependencies: [],
     prUrl: 'https://github.com/dev0-agent/devportfolio-mock/pull/1',
     prNumber: 1,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-15T10:05:00Z',
         level: 'info',
@@ -55,7 +59,7 @@ const rawTasks = [
         level: 'success',
         message: 'Project structure created',
       },
-    ]),
+    ],
     attempts: 1,
     maxAttempts: 3,
     createdAt: new Date('2026-01-15T10:00:00Z'),
@@ -73,7 +77,7 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.projectSetup],
     prUrl: 'https://github.com/dev0-agent/devportfolio-mock/pull/2',
     prNumber: 2,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-15T11:00:00Z',
         level: 'info',
@@ -89,7 +93,7 @@ const rawTasks = [
         level: 'success',
         message: 'Design system complete',
       },
-    ]),
+    ],
     attempts: 1,
     maxAttempts: 3,
     createdAt: new Date('2026-01-15T10:30:00Z'),
@@ -107,7 +111,7 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.designSystem],
     prUrl: 'https://github.com/dev0-agent/devportfolio-mock/pull/3',
     prNumber: 3,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-16T09:00:00Z',
         level: 'info',
@@ -123,7 +127,7 @@ const rawTasks = [
         level: 'success',
         message: 'All layout components ready',
       },
-    ]),
+    ],
     attempts: 1,
     maxAttempts: 3,
     createdAt: new Date('2026-01-16T08:00:00Z'),
@@ -142,7 +146,7 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.layoutComponents],
     prUrl: 'https://github.com/dev0-agent/devportfolio-mock/pull/4',
     prNumber: 4,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-17T09:00:00Z',
         level: 'info',
@@ -158,7 +162,7 @@ const rawTasks = [
         level: 'success',
         message: 'Hero section complete',
       },
-    ]),
+    ],
     attempts: 1,
     maxAttempts: 3,
     createdAt: new Date('2026-01-17T08:00:00Z'),
@@ -176,7 +180,7 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.layoutComponents],
     prUrl: 'https://github.com/dev0-agent/devportfolio-mock/pull/5',
     prNumber: 5,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-18T09:00:00Z',
         level: 'info',
@@ -192,7 +196,7 @@ const rawTasks = [
         level: 'info',
         message: 'PR created, awaiting review',
       },
-    ]),
+    ],
     attempts: 1,
     maxAttempts: 3,
     createdAt: new Date('2026-01-18T08:00:00Z'),
@@ -210,7 +214,7 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.layoutComponents],
     prUrl: null,
     prNumber: null,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-21T14:00:00Z',
         level: 'info',
@@ -226,7 +230,7 @@ const rawTasks = [
         level: 'info',
         message: 'Implementing filter functionality...',
       },
-    ]),
+    ],
     attempts: 1,
     maxAttempts: 3,
     createdAt: new Date('2026-01-19T08:00:00Z'),
@@ -263,7 +267,7 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.layoutComponents],
     prUrl: null,
     prNumber: null,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-20T09:00:00Z',
         level: 'info',
@@ -284,7 +288,7 @@ const rawTasks = [
         level: 'error',
         message: 'Error: Missing RESEND_API_KEY environment variable',
       },
-    ]),
+    ],
     attempts: 2,
     maxAttempts: 3,
     createdAt: new Date('2026-01-20T08:00:00Z'),
@@ -361,17 +365,55 @@ const rawTasks = [
     dependencies: [MOCK_TASK_IDS.seoOptimization],
     prUrl: null,
     prNumber: null,
-    logs: JSON.stringify([
+    logs: [
       {
         timestamp: '2026-01-21T10:00:00Z',
         level: 'info',
         message: 'Task skipped by user - will address post-launch',
       },
-    ]),
+    ],
     attempts: 0,
     maxAttempts: 3,
     createdAt: new Date('2026-01-21T10:00:00Z'),
     updatedAt: new Date('2026-01-21T10:05:00Z'),
+  },
+
+  // Demo Tasks - No dependencies, ready to start
+  {
+    id: MOCK_TASK_IDS.demoApiEndpoints,
+    projectId: PROJECT_ID,
+    title: 'Create REST API Endpoints',
+    description:
+      'Implement RESTful API endpoints for user authentication, project CRUD operations, and task management.',
+    phase: 1,
+    order: 10,
+    status: 'PENDING',
+    dependencies: [],
+    prUrl: null,
+    prNumber: null,
+    logs: null,
+    attempts: 0,
+    maxAttempts: 3,
+    createdAt: new Date('2026-01-21T11:00:00Z'),
+    updatedAt: new Date('2026-01-21T11:00:00Z'),
+  },
+  {
+    id: MOCK_TASK_IDS.demoUnitTests,
+    projectId: PROJECT_ID,
+    title: 'Write Unit Tests',
+    description:
+      'Add comprehensive unit tests for core utilities, hooks, and components using Vitest and React Testing Library.',
+    phase: 1,
+    order: 11,
+    status: 'PENDING',
+    dependencies: [],
+    prUrl: null,
+    prNumber: null,
+    logs: null,
+    attempts: 0,
+    maxAttempts: 3,
+    createdAt: new Date('2026-01-21T11:30:00Z'),
+    updatedAt: new Date('2026-01-21T11:30:00Z'),
   },
 ] satisfies Omit<Task, 'geminiModel'>[]
 
