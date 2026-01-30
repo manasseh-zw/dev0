@@ -29,12 +29,12 @@ function PreviewPage() {
 
   return (
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 h-full">
+      <Tabs value={activeTab}  onValueChange={setActiveTab} className="flex flex-col flex-1 h-full">
         <WebPreview defaultUrl={sandboxUrl} className="flex flex-col flex-1 h-full rounded-none border-0">
           {/* Navigation bar with tabs and sync button */}
           <WebPreviewNavigation className="justify-between border-b border-border bg-background px-3 lg:px-6 py-3 gap-3">
-            <TabsList className="dark:bg-zinc-800/80">
-              <TabsTrigger value="preview">
+            <TabsList  className="dark:bg-background">
+              <TabsTrigger  value="preview">
                 <HugeiconsIcon icon={ViewIcon} size={16} />
                 Preview
               </TabsTrigger>
@@ -43,7 +43,7 @@ function PreviewPage() {
                 Code
               </TabsTrigger>
             </TabsList>
-            <Button variant="outline" className="shadow-none gap-2" onClick={handleSync}>
+            <Button variant="outline" size="sm" className="shadow-none gap-2" onClick={handleSync}>
               <HugeiconsIcon icon={ArrowReloadVerticalIcon} className="size-4" />
               Sync
             </Button>
