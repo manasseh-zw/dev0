@@ -32,6 +32,7 @@ interface TaskCardProps {
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
   ) => void
   onStartTask?: (taskId: string) => void
+  onClick?: () => void
 }
 
 const modelOptions = [
@@ -47,7 +48,7 @@ const modelOptions = [
   },
 ] as const
 
-export function TaskCard({ task, status, isBlocked = false, onModelChange, onStartTask }: TaskCardProps) {
+export function TaskCard({ task, status, isBlocked = false, onModelChange, onStartTask, onClick }: TaskCardProps) {
   const StatusIcon = status.icon
   const isCompleted = task.status === 'DONE'
   const isFailed = task.status === 'FAILED'
@@ -62,7 +63,10 @@ export function TaskCard({ task, status, isBlocked = false, onModelChange, onSta
     modelOptions.find((option) => option.id === modelValue) ?? modelOptions[0]
 
   return (
-    <div className="bg-background shrink-0 rounded-lg overflow-hidden border border-border">
+    <div 
+      className="bg-background shrink-0 rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary/50 transition-colors"
+      onClick={onClick}
+    >
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2 mb-2">
           <div className="size-5 mt-0.5 shrink-0 flex items-center justify-center bg-muted rounded-sm p-1">

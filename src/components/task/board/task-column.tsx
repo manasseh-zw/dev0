@@ -17,9 +17,10 @@ interface TaskColumnProps {
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
   ) => void;
   onStartTask?: (taskId: string) => void;
+  onTaskClick?: (task: TaskWithBlocked) => void;
 }
 
-export function TaskColumn({ status, tasks, onModelChange, onStartTask }: TaskColumnProps) {
+export function TaskColumn({ status, tasks, onModelChange, onStartTask, onTaskClick }: TaskColumnProps) {
   const StatusIcon = status.icon;
 
   return (
@@ -65,6 +66,7 @@ export function TaskColumn({ status, tasks, onModelChange, onStartTask }: TaskCo
                   isBlocked={task.isBlocked}
                   onModelChange={onModelChange}
                   onStartTask={onStartTask}
+                  onClick={() => onTaskClick?.(task)}
                 />
               </motion.div>
             ))}
@@ -83,3 +85,4 @@ export function TaskColumn({ status, tasks, onModelChange, onStartTask }: TaskCo
     </div>
   );
 }
+

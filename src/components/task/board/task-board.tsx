@@ -6,20 +6,32 @@ import type { TaskStatus, TaskWithBlocked } from '@/lib/types';
 import { updateTaskModel, startExecution } from '@/lib/actions';
 import { statuses } from '@/components/task/mock-data/statuses';
 import { TaskColumn } from './task-column';
+import { TaskSheet } from '@/components/task/sheet';
 
 type TaskBoardProps = {
   /** Tasks with isBlocked pre-computed (from server action or mock data) */
   tasks: TaskWithBlocked[];
+  /** Project ID for SSE connection */
+  projectId?: string;
 };
 
 type GeminiModel = 'gemini-3-flash-preview' | 'gemini-3-pro-preview';
 
-export function TaskBoard({ tasks }: TaskBoardProps) {
+export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
   const [items, setItems] = React.useState<TaskWithBlocked[]>(tasks);
+  const [selectedTask, setSelectedTask] = React.useState<TaskWithBlocked | null>(null);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
     setItems(tasks);
-  }, [tasks]);
+    // Update selected task if it changed
+    if (selectedTask) {
+      const updated = tasks.find((t) => t.id === selectedTask.id);
+      if (updated) {
+        setSelectedTask(updated);
+      }
+    }
+  }, [tasks, selectedTask?.id]);
 
   // Group tasks by status
   const tasksByStatus = React.useMemo(() => groupTasksByStatus(items), [items]);
@@ -104,20 +116,36 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
     }
   }, [items]);
 
+  // Handle task card click to open sheet
+  const handleTaskClick = React.useCallback((task: TaskWithBlocked) => {
+    setSelectedTask(task);
+    setSheetOpen(true);
+  }, []);
+
   return (
-    <LayoutGroup>
-      <div className="flex h-full gap-3 px-3 pt-4 pb-2 min-w-max overflow-hidden">
-        {statuses.map((status) => (
-          <TaskColumn
-            key={status.id}
-            status={status}
-            tasks={tasksByStatus[status.id] || []}
-            onModelChange={handleModelChange}
-            onStartTask={handleStartTask}
-          />
-        ))}
-      </div>
-    </LayoutGroup>
+    <>
+      <LayoutGroup>
+        <div className="flex h-full gap-3 px-3 pt-4 pb-2 min-w-max overflow-hidden">
+          {statuses.map((status) => (
+            <TaskColumn
+              key={status.id}
+              status={status}
+              tasks={tasksByStatus[status.id] || []}
+              onModelChange={handleModelChange}
+              onStartTask={handleStartTask}
+              onTaskClick={handleTaskClick}
+            />
+          ))}
+        </div>
+      </LayoutGroup>
+
+      <TaskSheet
+        task={selectedTask}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        projectId={projectId ?? selectedTask?.projectId}
+      />
+    </>
   );
 }
 
@@ -136,3 +164,4 @@ function groupTasksByStatus(tasks: TaskWithBlocked[]): Record<TaskStatus, TaskWi
     return acc;
   }, initial);
 }
+
