@@ -40,17 +40,20 @@ export default function DashboardNavigation({ routes }: { routes: Route[] }) {
   const matchRoute = useMatchRoute()
 
   const isActiveLink = (link: string) =>
-    link.startsWith('/') && !!matchRoute({ to: link, fuzzy: true })
+    link.startsWith('/') && !!matchRoute({ to: link, fuzzy: false })
 
   return (
-    <SidebarMenu>
+    <SidebarMenu className="gap-1">
       {routes.map((route) => {
-        const isOpen = !isCollapsed && openCollapsible === route.id
         const hasSubRoutes = !!route.subs?.length
         const isRouteActive = isActiveLink(route.link)
         const isSubRouteActive =
           route.subs?.some((subRoute) => isActiveLink(subRoute.link)) ?? false
-        const isActive = isRouteActive || isSubRouteActive
+        const isOpen =
+          !isCollapsed &&
+          (openCollapsible === route.id ||
+            (openCollapsible === null && isSubRouteActive))
+        const isActive = isRouteActive
 
         return (
           <SidebarMenuItem key={route.id}>
@@ -67,10 +70,10 @@ export default function DashboardNavigation({ routes }: { routes: Route[] }) {
                     <SidebarMenuButton
                       isActive={isActive}
                       className={cn(
-                        'flex w-full items-center rounded-lg px-2 transition-colors data-active:bg-sidebar-muted data-active:text-foreground',
+                        'flex w-full items-center rounded-lg px-2 transition-colors data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground',
                         isOpen
-                          ? 'bg-sidebar-muted text-foreground'
-                          : 'text-muted-foreground hover:bg-sidebar-muted hover:text-foreground',
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                          : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                         isCollapsed && 'justify-center',
                       )}
                     />
@@ -109,7 +112,7 @@ export default function DashboardNavigation({ routes }: { routes: Route[] }) {
                         >
                           <SidebarMenuSubButton
                             isActive={isActiveLink(subRoute.link)}
-                            className="px-4 py-1.5 text-muted-foreground hover:bg-sidebar-muted hover:text-foreground data-active:bg-sidebar-muted data-active:text-foreground"
+                            className="px-4 py-1.5 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
                             render={<Link to={subRoute.link} />}
                           >
                             {subRoute.title}
@@ -122,10 +125,9 @@ export default function DashboardNavigation({ routes }: { routes: Route[] }) {
               </Collapsible>
             ) : (
               <SidebarMenuButton
-                tooltip={route.title}
                 isActive={isActive}
                 className={cn(
-                  'text-muted-foreground hover:bg-sidebar-muted hover:text-foreground data-active:bg-sidebar-muted data-active:text-foreground',
+                  'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground',
                   isCollapsed && 'justify-center',
                 )}
                 render={<Link to={route.link} />}
