@@ -25,7 +25,8 @@ import 'react-circular-progressbar/dist/styles.css'
 interface TaskCardProps {
   task: Task
   status: Status
-  allTasks?: Task[]
+  /** Pre-computed blocked status - computed at board level for performance */
+  isBlocked?: boolean
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
@@ -46,18 +47,11 @@ const modelOptions = [
   },
 ] as const
 
-export function TaskCard({ task, status, allTasks = [], onModelChange, onStartTask }: TaskCardProps) {
+export function TaskCard({ task, status, isBlocked = false, onModelChange, onStartTask }: TaskCardProps) {
   const StatusIcon = status.icon
   const isCompleted = task.status === 'DONE'
   const isFailed = task.status === 'FAILED'
   const isPending = task.status === 'PENDING'
-  
-  // Check if any dependency is NOT completed (DONE status)
-  const hasUnmetDependencies = task.dependencies.length > 0 && task.dependencies.some((depId) => {
-    const depTask = allTasks.find((t) => t.id === depId)
-    return !depTask || depTask.status !== 'DONE'
-  })
-  const isBlocked = isPending && hasUnmetDependencies
   const hasPr = Boolean(task.prUrl)
   const hasAttempts = task.maxAttempts > 0
   const attemptProgress = hasAttempts

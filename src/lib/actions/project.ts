@@ -162,7 +162,7 @@ function buildRepoContext(plan: PlannerOutput): string {
 }
 
 /**
- * Get a project by ID with its tasks
+ * Get a project by ID with its tasks (including computed blocked status)
  */
 export const getProject = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ projectId: z.string() }))
@@ -185,11 +185,12 @@ export const getProject = createServerFn({ method: 'GET' })
 
     return {
       ...project[0],
-      tasks: projectTasks,
+      tasks: computeBlockedStatus(projectTasks),
     }
   })
 
-export type ProjectWithTasks = Project & { tasks: Task[] }
+export type TaskWithBlocked = Task & { isBlocked: boolean }
+export type ProjectWithTasks = Project & { tasks: TaskWithBlocked[] }
 
 /**
  * Get all projects (for dashboard/listing)
@@ -218,16 +219,40 @@ export const getProjects = createServerFn({ method: 'GET' }).handler(
 export type ProjectWithCount = Project & { _count: { tasks: number } }
 
 /**
- * Get tasks for a project
+ * Compute blocked status for a list of tasks.
+ * A task is blocked if it's PENDING and has any dependency that is not DONE.
+ */
+function computeBlockedStatus<T extends Task>(tasks: T[]): (T & { isBlocked: boolean })[] {
+  const statusMap = new Map(tasks.map((t) => [t.id, t.status]))
+
+  return tasks.map((task) => {
+    const hasUnmetDependencies =
+      task.dependencies.length > 0 &&
+      task.dependencies.some((depId) => {
+        const depStatus = statusMap.get(depId)
+        return !depStatus || depStatus !== 'DONE'
+      })
+
+    return {
+      ...task,
+      isBlocked: task.status === 'PENDING' && hasUnmetDependencies,
+    }
+  })
+}
+
+/**
+ * Get tasks for a project with computed blocked status
  */
 export const getProjectTasks = createServerFn({ method: 'GET' })
   .inputValidator(z.object({ projectId: z.string() }))
   .handler(async ({ data }: { data: { projectId: string } }) => {
-    return db
+    const projectTasks = await db
       .select()
       .from(tasks)
       .where(eq(tasks.projectId, data.projectId))
       .orderBy(asc(tasks.phase), asc(tasks.order))
+
+    return computeBlockedStatus(projectTasks)
   })
 
 /**

@@ -29,7 +29,7 @@ export const Route = createFileRoute('/project/$projectId')({
 })
 
 function ProjectPage() {
-  // @ts-expect-error - TODO: Use project data to initialize task store
+
   const project = Route.useLoaderData()
 
   return (

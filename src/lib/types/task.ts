@@ -21,3 +21,12 @@ export type TaskWithProject = Task & {
     repoName: string | null
   }
 }
+
+/**
+ * Task with pre-computed blocked status.
+ * Computed server-side based on dependency status.
+ * A task is blocked if it's PENDING and has any dependency that is not DONE.
+ */
+export type TaskWithBlocked = Task & {
+  isBlocked: boolean
+}

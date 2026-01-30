@@ -2,25 +2,27 @@
 
 import * as React from 'react';
 import { LayoutGroup } from 'motion/react';
-import type { Task, TaskStatus } from '@/lib/types';
+import type { TaskStatus, TaskWithBlocked } from '@/lib/types';
 import { updateTaskModel, startExecution } from '@/lib/actions';
 import { statuses } from '@/components/task/mock-data/statuses';
 import { TaskColumn } from './task-column';
 
 type TaskBoardProps = {
-  tasks: Task[];
+  /** Tasks with isBlocked pre-computed (from server action or mock data) */
+  tasks: TaskWithBlocked[];
 };
 
 type GeminiModel = 'gemini-3-flash-preview' | 'gemini-3-pro-preview';
 
 export function TaskBoard({ tasks }: TaskBoardProps) {
-  const [items, setItems] = React.useState<Task[]>(tasks);
+  const [items, setItems] = React.useState<TaskWithBlocked[]>(tasks);
 
   React.useEffect(() => {
     setItems(tasks);
   }, [tasks]);
 
-  const tasksByStatus = groupTasksByStatus(items);
+  // Group tasks by status
+  const tasksByStatus = React.useMemo(() => groupTasksByStatus(items), [items]);
 
   const handleModelChange = React.useCallback(
     async (taskId: string, model: GeminiModel) => {
@@ -110,7 +112,6 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
             key={status.id}
             status={status}
             tasks={tasksByStatus[status.id] || []}
-            allTasks={items}
             onModelChange={handleModelChange}
             onStartTask={handleStartTask}
           />
@@ -120,8 +121,8 @@ export function TaskBoard({ tasks }: TaskBoardProps) {
   );
 }
 
-function groupTasksByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
-  const initial: Record<TaskStatus, Task[]> = {
+function groupTasksByStatus(tasks: TaskWithBlocked[]): Record<TaskStatus, TaskWithBlocked[]> {
+  const initial: Record<TaskStatus, TaskWithBlocked[]> = {
     PENDING: [],
     RUNNING: [],
     REVIEW: [],
@@ -135,4 +136,3 @@ function groupTasksByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
     return acc;
   }, initial);
 }
-

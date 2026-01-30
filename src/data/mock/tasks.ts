@@ -1,4 +1,4 @@
-import type { Task } from '@/lib/types/task'
+import type { Task, TaskWithBlocked } from '@/lib/types/task'
 
 export const MOCK_TASK_IDS = {
   // Phase 1: Foundation
@@ -417,10 +417,39 @@ const rawTasks = [
   },
 ] satisfies Omit<Task, 'geminiModel'>[]
 
+// Base tasks without isBlocked (for internal use)
 export const mockTasks: Task[] = rawTasks.map((task) => ({
   ...task,
   geminiModel: defaultGeminiModel,
 }))
+
+/**
+ * Compute blocked status for mock tasks.
+ * Mirrors the server-side computeBlockedStatus function.
+ */
+function computeMockBlockedStatus(tasks: Task[]): TaskWithBlocked[] {
+  const statusMap = new Map(tasks.map((t) => [t.id, t.status]))
+
+  return tasks.map((task) => {
+    const hasUnmetDependencies =
+      task.dependencies.length > 0 &&
+      task.dependencies.some((depId) => {
+        const depStatus = statusMap.get(depId)
+        return !depStatus || depStatus !== 'DONE'
+      })
+
+    return {
+      ...task,
+      isBlocked: task.status === 'PENDING' && hasUnmetDependencies,
+    }
+  })
+}
+
+/**
+ * Mock tasks with isBlocked pre-computed.
+ * Use this for UI components that expect TaskWithBlocked[].
+ */
+export const mockTasksWithBlocked: TaskWithBlocked[] = computeMockBlockedStatus(mockTasks)
 
 /**
  * Get task counts by status for statistics

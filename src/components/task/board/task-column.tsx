@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import type { Task } from "@/lib/types";
+import type { TaskWithBlocked } from "@/lib/types";
 import { Status } from "@/components/task/mock-data/statuses";
 import { TaskCard } from "./task-card";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button";
 
 interface TaskColumnProps {
   status: Status;
-  tasks: Task[];
-  allTasks: Task[];
+  tasks: TaskWithBlocked[];
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
@@ -20,7 +19,7 @@ interface TaskColumnProps {
   onStartTask?: (taskId: string) => void;
 }
 
-export function TaskColumn({ status, tasks, allTasks, onModelChange, onStartTask }: TaskColumnProps) {
+export function TaskColumn({ status, tasks, onModelChange, onStartTask }: TaskColumnProps) {
   const StatusIcon = status.icon;
 
   return (
@@ -63,7 +62,7 @@ export function TaskColumn({ status, tasks, allTasks, onModelChange, onStartTask
                 <TaskCard
                   task={task}
                   status={status}
-                  allTasks={allTasks}
+                  isBlocked={task.isBlocked}
                   onModelChange={onModelChange}
                   onStartTask={onStartTask}
                 />
@@ -84,5 +83,3 @@ export function TaskColumn({ status, tasks, allTasks, onModelChange, onStartTask
     </div>
   );
 }
-
-
