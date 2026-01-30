@@ -13,6 +13,9 @@ import { Route as ProjectRouteImport } from './routes/project'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectProjectIdRouteImport } from './routes/project/$projectId'
+import { Route as ProjectProjectIdIndexRouteImport } from './routes/project/$projectId/index'
+import { Route as ProjectProjectIdReviewRouteImport } from './routes/project/$projectId/review'
+import { Route as ProjectProjectIdPreviewRouteImport } from './routes/project/$projectId/preview'
 import { Route as ApiEventsProjectIdRouteImport } from './routes/api/events/$projectId'
 
 const ProjectRoute = ProjectRouteImport.update({
@@ -35,6 +38,21 @@ const ProjectProjectIdRoute = ProjectProjectIdRouteImport.update({
   path: '/$projectId',
   getParentRoute: () => ProjectRoute,
 } as any)
+const ProjectProjectIdIndexRoute = ProjectProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectProjectIdRoute,
+} as any)
+const ProjectProjectIdReviewRoute = ProjectProjectIdReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => ProjectProjectIdRoute,
+} as any)
+const ProjectProjectIdPreviewRoute = ProjectProjectIdPreviewRouteImport.update({
+  id: '/preview',
+  path: '/preview',
+  getParentRoute: () => ProjectProjectIdRoute,
+} as any)
 const ApiEventsProjectIdRoute = ApiEventsProjectIdRouteImport.update({
   id: '/api/events/$projectId',
   path: '/api/events/$projectId',
@@ -45,23 +63,31 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
-  '/project/$projectId': typeof ProjectProjectIdRoute
+  '/project/$projectId': typeof ProjectProjectIdRouteWithChildren
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
+  '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
+  '/project/$projectId/review': typeof ProjectProjectIdReviewRoute
+  '/project/$projectId/': typeof ProjectProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
-  '/project/$projectId': typeof ProjectProjectIdRoute
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
+  '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
+  '/project/$projectId/review': typeof ProjectProjectIdReviewRoute
+  '/project/$projectId': typeof ProjectProjectIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
-  '/project/$projectId': typeof ProjectProjectIdRoute
+  '/project/$projectId': typeof ProjectProjectIdRouteWithChildren
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
+  '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
+  '/project/$projectId/review': typeof ProjectProjectIdReviewRoute
+  '/project/$projectId/': typeof ProjectProjectIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,13 +97,18 @@ export interface FileRouteTypes {
     | '/project'
     | '/project/$projectId'
     | '/api/events/$projectId'
+    | '/project/$projectId/preview'
+    | '/project/$projectId/review'
+    | '/project/$projectId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/new'
     | '/project'
-    | '/project/$projectId'
     | '/api/events/$projectId'
+    | '/project/$projectId/preview'
+    | '/project/$projectId/review'
+    | '/project/$projectId'
   id:
     | '__root__'
     | '/'
@@ -85,6 +116,9 @@ export interface FileRouteTypes {
     | '/project'
     | '/project/$projectId'
     | '/api/events/$projectId'
+    | '/project/$projectId/preview'
+    | '/project/$projectId/review'
+    | '/project/$projectId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -124,6 +158,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectProjectIdRouteImport
       parentRoute: typeof ProjectRoute
     }
+    '/project/$projectId/': {
+      id: '/project/$projectId/'
+      path: '/'
+      fullPath: '/project/$projectId/'
+      preLoaderRoute: typeof ProjectProjectIdIndexRouteImport
+      parentRoute: typeof ProjectProjectIdRoute
+    }
+    '/project/$projectId/review': {
+      id: '/project/$projectId/review'
+      path: '/review'
+      fullPath: '/project/$projectId/review'
+      preLoaderRoute: typeof ProjectProjectIdReviewRouteImport
+      parentRoute: typeof ProjectProjectIdRoute
+    }
+    '/project/$projectId/preview': {
+      id: '/project/$projectId/preview'
+      path: '/preview'
+      fullPath: '/project/$projectId/preview'
+      preLoaderRoute: typeof ProjectProjectIdPreviewRouteImport
+      parentRoute: typeof ProjectProjectIdRoute
+    }
     '/api/events/$projectId': {
       id: '/api/events/$projectId'
       path: '/api/events/$projectId'
@@ -134,12 +189,27 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ProjectProjectIdRouteChildren {
+  ProjectProjectIdPreviewRoute: typeof ProjectProjectIdPreviewRoute
+  ProjectProjectIdReviewRoute: typeof ProjectProjectIdReviewRoute
+  ProjectProjectIdIndexRoute: typeof ProjectProjectIdIndexRoute
+}
+
+const ProjectProjectIdRouteChildren: ProjectProjectIdRouteChildren = {
+  ProjectProjectIdPreviewRoute: ProjectProjectIdPreviewRoute,
+  ProjectProjectIdReviewRoute: ProjectProjectIdReviewRoute,
+  ProjectProjectIdIndexRoute: ProjectProjectIdIndexRoute,
+}
+
+const ProjectProjectIdRouteWithChildren =
+  ProjectProjectIdRoute._addFileChildren(ProjectProjectIdRouteChildren)
+
 interface ProjectRouteChildren {
-  ProjectProjectIdRoute: typeof ProjectProjectIdRoute
+  ProjectProjectIdRoute: typeof ProjectProjectIdRouteWithChildren
 }
 
 const ProjectRouteChildren: ProjectRouteChildren = {
-  ProjectProjectIdRoute: ProjectProjectIdRoute,
+  ProjectProjectIdRoute: ProjectProjectIdRouteWithChildren,
 }
 
 const ProjectRouteWithChildren =

@@ -19,35 +19,9 @@ import {
 } from '@hugeicons/core-free-icons'
 import { Logo, LogoIcon } from '@/components/logo'
 import type { Route } from './nav-main'
-import DashboardNavigation from '@/components/sidebar/nav-main'
-import { TeamSwitcher } from '@/components/sidebar/team-switcher'
-
-const dashboardRoutes: Route[] = [
-  {
-    id: 'dashboard',
-    title: 'Dashboard',
-    icon: <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4" />,
-    link: '/project',
-  },
-  {
-    id: 'review',
-    title: 'Review',
-    icon: <HugeiconsIcon icon={GitPullRequestIcon} className="size-4" />,
-    link: '#',
-  },
-  {
-    id: 'preview',
-    title: 'Preview',
-    icon: <HugeiconsIcon icon={ChatPreviewIcon} className="size-4" />,
-    link: '#',
-  },
-  {
-    id: 'settings',
-    title: 'Settings',
-    icon: <HugeiconsIcon icon={Settings01Icon} className="size-4" />,
-    link: '#',
-  },
-]
+import DashboardNavigation from '@/components/layout/nav-main'
+import { TeamSwitcher } from '@/components/layout/team-switcher'
+import { useLocation } from '@tanstack/react-router'
 
 const teams = [
   {
@@ -76,6 +50,36 @@ const teams = [
 export function DashboardSidebar() {
   const { state } = useSidebar()
   const isCollapsed = state === 'collapsed'
+  const { pathname } = useLocation()
+  const projectId = pathname.split('/')[2] || 'mock'
+  const basePath = `/project/${projectId}`
+
+  const dashboardRoutes: Route[] = [
+    {
+      id: 'dashboard',
+      title: 'Dashboard',
+      icon: <HugeiconsIcon icon={DashboardSquare01Icon} className="size-4" />,
+      link: basePath,
+    },
+    {
+      id: 'review',
+      title: 'Review',
+      icon: <HugeiconsIcon icon={GitPullRequestIcon} className="size-4" />,
+      link: `${basePath}/review`,
+    },
+    {
+      id: 'preview',
+      title: 'Preview',
+      icon: <HugeiconsIcon icon={ChatPreviewIcon} className="size-4" />,
+      link: `${basePath}/preview`,
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: <HugeiconsIcon icon={Settings01Icon} className="size-4" />,
+      link: '#',
+    },
+  ]
 
   return (
     <Sidebar variant="inset" collapsible="icon">

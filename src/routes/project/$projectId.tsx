@@ -1,19 +1,20 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useLocation } from '@tanstack/react-router'
 import { getProject } from '@/lib/actions'
 import { getMockProject, isMockProjectId } from '@/data/mock'
-import { TaskBoard } from '@/components/task/board/task-board'
-import { TaskHeader } from '@/components/task/header/task-header'
+import { ProjectHeader } from '@/components/layout/header/project-header'
 
 export const Route = createFileRoute('/project/$projectId')({
-  component: ProjectPage,
+  component: ProjectLayout,
   loader: async ({ params }) => {
     // Use mock data for development when projectId is 'mock'
     if (isMockProjectId(params.projectId)) {
       const mockData = getMockProject()
       return mockData
     }
-    
-    const projectData = await getProject({ data: { projectId: params.projectId } })
+
+    const projectData = await getProject({
+      data: { projectId: params.projectId },
+    })
 
     return projectData
   },
@@ -28,16 +29,18 @@ export const Route = createFileRoute('/project/$projectId')({
   ),
 })
 
-function ProjectPage() {
-
-  const project = Route.useLoaderData()
+function ProjectLayout() {
+  const { pathname } = useLocation()
+  const title = pathname.endsWith('/review')
+    ? 'Review'
+    : pathname.endsWith('/preview')
+      ? 'Preview'
+      : 'Dashboard'
 
   return (
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
-          <TaskHeader />
-      <main className="flex-1 w-full overflow-x-auto">
-        <TaskBoard tasks={project.tasks} />
-      </main>
+      <ProjectHeader title={title} />
+      <Outlet />
     </div>
   )
 }

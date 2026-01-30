@@ -1,5 +1,5 @@
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { DashboardSidebar } from "@/components/sidebar/app-sidebar";
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { DashboardSidebar } from '@/components/layout/sidebar/app-sidebar'
 
 export default function Sidebar02() {
   return (
@@ -9,5 +9,5 @@ export default function Sidebar02() {
         <SidebarInset className="flex flex-col" />
       </div>
     </SidebarProvider>
-  );
+  )
 }
