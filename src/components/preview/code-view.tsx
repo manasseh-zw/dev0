@@ -164,7 +164,7 @@ export function CodeView() {
             showLineNumbers
             className="h-full rounded-none border-none"
           >
-            <CodeBlockHeader>
+            <CodeBlockHeader className="h-[37px]">
               <CodeBlockTitle>
                 <FileIcon size={14} />
                 <CodeBlockFilename>{filename}</CodeBlockFilename>

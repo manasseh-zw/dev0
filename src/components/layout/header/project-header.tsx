@@ -1,7 +1,7 @@
 'use client'
 
 import { HugeiconsIcon } from '@hugeicons/react'
-import { GithubIcon, Link01Icon } from '@hugeicons/core-free-icons'
+import { GithubIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { ThemeSwitcher } from '@/components/theme-switcher'
 
@@ -29,14 +29,6 @@ export function ProjectHeader({ title }: ProjectHeaderProps) {
               <HugeiconsIcon icon={GithubIcon} className="size-4" />
               GitHub
             </a>
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-2 hidden lg:flex"
-          >
-            <HugeiconsIcon icon={Link01Icon} className="size-4" />
-            Share
           </Button>
         </div>
       </div>
