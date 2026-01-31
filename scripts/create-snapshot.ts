@@ -37,17 +37,17 @@ const CONTEXT7_API_KEY = process.env.CONTEXT7_API_KEY
 
 function validateEnv() {
   const missing: string[] = []
-  
+
   if (!AGENT_GEMINI_API_KEY) {
     missing.push('AGENT_GEMINI_API_KEY')
   }
   if (!CONTEXT7_API_KEY) {
     missing.push('CONTEXT7_API_KEY')
   }
-  
+
   if (missing.length > 0) {
     console.error('❌ Missing required environment variables:')
-    missing.forEach(v => console.error(`   - ${v}`))
+    missing.forEach((v) => console.error(`   - ${v}`))
     console.error('\nPlease add these to your .env.local file')
     process.exit(1)
   }
@@ -59,23 +59,23 @@ function validateEnv() {
  */
 function generateGeminiSettings(): string {
   const settings = {
-    selectedAuthType: "gemini-api-key", // Critical for headless/non-interactive use
+    selectedAuthType: 'gemini-api-key', // Critical for headless/non-interactive use
     mcpServers: {
       context7: {
         url: 'https://mcp.context7.com/mcp', // standard field is 'url'
         headers: {
           'x-api-key': CONTEXT7_API_KEY, // verify exact header with context7 docs
-          'Accept': 'application/json'
-        }
-      }
-    }
+          Accept: 'application/json',
+        },
+      },
+    },
   }
   return JSON.stringify(settings)
 }
 async function createSnapshot() {
   // Validate environment variables before proceeding
   validateEnv()
-  
+
   const daytona = new Daytona()
 
   console.log('🚀 Creating Universal Snapshot for dev0\n')
@@ -99,14 +99,14 @@ async function createSnapshot() {
   // Generate configurations (single-line, shell-safe)
   const geminiSettings = generateGeminiSettings()
 
-
   const universalImage = Image.base('oven/bun:1.3')
     .env({
       GEMINI_API_KEY: AGENT_GEMINI_API_KEY!,
-      CONTEXT7_API_KEY: CONTEXT7_API_KEY!
+      CONTEXT7_API_KEY: CONTEXT7_API_KEY!,
     })
     .runCommands(
-      'apt-get update && apt-get install -y git curl sudo jq procps',
+      // Add 'ripgrep' here to prevent the CLI from trying to download it later
+      'apt-get update && apt-get install -y git curl sudo jq procps ripgrep',
       'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg',
       'chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg',
       'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null',
@@ -114,9 +114,10 @@ async function createSnapshot() {
       'bun install -g @google/gemini-cli',
       'mkdir -p ~/.gemini',
       `echo '${geminiSettings}' > ~/.gemini/settings.json`,
-      `mkdir -p ${WORKING_DIR}`
+      `mkdir -p ${WORKING_DIR}`,
     )
     .workdir(WORKING_DIR)
+
   console.log('Building snapshot (this may take a few minutes)...\n')
 
   // Handle process termination gracefully
@@ -133,16 +134,19 @@ async function createSnapshot() {
   try {
     await daytona.snapshot.create(
       { name: SNAPSHOT_NAME, image: universalImage },
-      { 
+      {
         onLogs: (log) => {
           // Check for error messages in the log
-          if (log.toLowerCase().includes('error') || log.toLowerCase().includes('failed')) {
+          if (
+            log.toLowerCase().includes('error') ||
+            log.toLowerCase().includes('failed')
+          ) {
             console.error(log)
           } else {
             process.stdout.write(log)
           }
-        }
-      }
+        },
+      },
     )
 
     console.log(`\n✅ Snapshot "${SNAPSHOT_NAME}" created successfully!`)
@@ -159,11 +163,13 @@ async function createSnapshot() {
     console.log('  - Uses HTTP URL: https://mcp.context7.com/mcp')
     console.log('  - API key injected via headers')
     console.log('\nYOLO Mode Usage:')
-    console.log('  gemini --yolo --model gemini-3-pro-preview -p "your prompt here"')
+    console.log(
+      '  gemini --yolo --model gemini-3-pro-preview -p "your prompt here"',
+    )
     console.log('\nUsage:')
     console.log('  This snapshot is used as the base for all dev0 sandboxes.')
     console.log('  Projects are cloned from template repos at runtime.')
-    
+
     process.exit(0)
   } catch (error) {
     console.error('\n❌ Failed to create snapshot:')

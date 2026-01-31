@@ -1,22 +1,26 @@
-import { getDaytonaClient } from '@/lib/sandbox/client'
-import { getTemplate } from '@/lib/templates'
-import { env } from '@/lib/env'
 import { db } from '@/lib/db'
 import { projects, sandboxes } from '@/lib/db/schema'
+import { env } from '@/lib/env'
+import { getDaytonaClient } from '@/lib/sandbox/client'
+import { getTemplate } from '@/lib/templates'
 import type {
-  CreateSandboxConfig,
-  SandboxInstance,
-  ExecuteCommandOptions,
   CommandResult,
+  CreateSandboxConfig,
+  ExecuteCommandOptions,
   GeminiExecOptions,
-  StreamingCommandOptions,
+  SandboxInstance,
   StreamingCallbacks,
+  StreamingCommandOptions,
 } from '@/lib/types'
-import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
+import { and, eq } from 'drizzle-orm'
 
 function escapeForDoubleQuotes(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`')
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\$/g, '\\$')
+    .replace(/`/g, '\\`')
 }
 
 function escapeForSingleQuotes(value: string): string {
@@ -127,8 +131,10 @@ export async function getOrCreateProjectSandbox(
   projectId: string,
   taskId?: string,
 ): Promise<SandboxInstance> {
-  console.log(`[SANDBOX] getOrCreateProjectSandbox - projectId: ${projectId}, taskId: ${taskId ?? 'none'}`)
-  
+  console.log(
+    `[SANDBOX] getOrCreateProjectSandbox - projectId: ${projectId}, taskId: ${taskId ?? 'none'}`,
+  )
+
   const existing = await db
     .select()
     .from(sandboxes)
@@ -212,7 +218,9 @@ export async function executeCommandStreaming(
   const daytona = getDaytonaClient()
   const dbSandbox = await getSandboxRecord(sandboxId)
 
-  console.log(`[SANDBOX] executeCommandStreaming - getting sandbox ${dbSandbox.daytonaId}`)
+  console.log(
+    `[SANDBOX] executeCommandStreaming - getting sandbox ${dbSandbox.daytonaId}`,
+  )
   const sandbox = await daytona.get(dbSandbox.daytonaId)
   console.log(`[SANDBOX] Got sandbox, preparing command...`)
 
@@ -232,7 +240,10 @@ export async function executeCommandStreaming(
       { command: fullCommand, runAsync: true },
       options?.timeout ?? 600000, // 10 minutes default for long-running AI tasks
     )
-    console.log(`[SANDBOX] Session command started, response:`, JSON.stringify(response))
+    console.log(
+      `[SANDBOX] Session command started, response:`,
+      JSON.stringify(response),
+    )
 
     const cmdId = response.cmdId ?? (response as { cmd_id?: string }).cmd_id
     if (!cmdId) {
@@ -338,14 +349,17 @@ export async function executeGeminiStreaming(
     onOutput,
   } = options
 
-  console.log(`[SANDBOX] executeGeminiStreaming - model: ${model}, cwd: ${cwd ?? 'default'}, prompt length: ${prompt.length}`)
+  console.log(
+    `[SANDBOX] executeGeminiStreaming - model: ${model}, cwd: ${cwd ?? 'default'}, prompt length: ${prompt.length}`,
+  )
 
   const geminiCmd = [
-    `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
+    'unset GOOGLE_CLOUD_PROJECT &&',
+    'unset GOOGLE_CLOUD_PROJECT_ID &&',
     'gemini',
     yolo ? '--yolo' : '',
     `--model ${model}`,
-    '--output-format stream-json', // Structured JSONL output for real-time events
+    '--output-format stream-json',
     `-p "${escapeForDoubleQuotes(prompt)}"`,
   ]
     .filter(Boolean)
