@@ -35,7 +35,12 @@ class ExecutionEventBus extends EventEmitter {
     ...args: unknown[]
   ): boolean {
     if (typeof eventOrName === 'object' && eventOrName) {
-      return super.emit(eventOrName.projectId, eventOrName)
+      const event = eventOrName
+      if (event.type !== 'task_log') {
+        // Log all events except logs (too noisy)
+        console.log(`[EVENT_BUS] Emitting ${event.type} for project ${event.projectId}`)
+      }
+      return super.emit(event.projectId, event)
     }
     return super.emit(eventOrName, ...args)
   }

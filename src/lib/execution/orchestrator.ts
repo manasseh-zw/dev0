@@ -34,9 +34,12 @@ export async function startTask(
   projectId: string,
   taskId?: string,
 ): Promise<StartTaskResult> {
+  console.log(`[ORCHESTRATOR] startTask called - projectId: ${projectId}, taskId: ${taskId ?? 'auto'}`)
+  
   const currentState = projectState.get(projectId)
 
   if (currentState?.runningTaskId || currentState?.starting) {
+    console.log(`[ORCHESTRATOR] Task already running for project ${projectId} - taskId: ${currentState?.runningTaskId}`)
     return {
       taskId: currentState?.runningTaskId ?? '',
       sandboxId: currentState?.sandboxId ?? '',
@@ -49,6 +52,7 @@ export async function startTask(
     sandboxId: null,
     starting: true,
   })
+  console.log(`[ORCHESTRATOR] Set project state to starting`)
 
   try {
     let task: Task | null = null
@@ -117,8 +121,10 @@ export async function startTask(
     let sandboxId = ''
 
     try {
+      console.log(`[ORCHESTRATOR] Getting or creating sandbox for project ${projectId}, task ${task.id}`)
       const sandbox = await getOrCreateProjectSandbox(projectId, task.id)
       sandboxId = sandbox.id
+      console.log(`[ORCHESTRATOR] Sandbox ready - sandboxId: ${sandboxId}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sandbox error'
       await db
@@ -148,6 +154,7 @@ export async function startTask(
       starting: false,
     })
 
+    console.log(`[ORCHESTRATOR] Emitting task_started event for task ${task.id}`)
     executionBus.emit({
       type: 'task_started',
       projectId,
@@ -155,6 +162,7 @@ export async function startTask(
       sandboxId,
     })
 
+    console.log(`[ORCHESTRATOR] Starting async task execution...`)
     void runTaskExecution(projectId, task, sandboxId)
 
     return {
@@ -179,6 +187,8 @@ export async function completeTask(
   taskId: string,
   result: CompletionResult,
 ): Promise<void> {
+  console.log(`[ORCHESTRATOR] completeTask called - taskId: ${taskId}, success: ${result.success}, prUrl: ${result.prUrl ?? 'none'}`)
+  
   if (result.success) {
     await db
       .update(tasks)
@@ -256,9 +266,12 @@ async function runTaskExecution(
   task: Task,
   sandboxId: string,
 ): Promise<void> {
+  console.log(`[ORCHESTRATOR] runTaskExecution started - task: ${task.title}`)
+  
   try {
     const project = await getProjectById(projectId)
     const prompt = buildTaskPrompt(project, task)
+    console.log(`[ORCHESTRATOR] Built prompt, executing Gemini CLI...`)
 
     const result = await executeGeminiStreaming(
       sandboxId,
@@ -270,15 +283,35 @@ async function runTaskExecution(
       },
       {
         onStdout: (chunk) => {
-          executionBus.emit({
-            type: 'task_log',
-            projectId,
-            taskId: task.id,
-            log: chunk,
-            stream: 'stdout',
-          })
+          // Parse JSONL events from --output-format stream-json
+          for (const line of chunk.split('\n')) {
+            if (!line.trim()) continue
+            try {
+              const event = JSON.parse(line)
+              console.log(`[GEMINI] Event: ${event.type}`)
+              executionBus.emit({
+                type: 'task_log',
+                projectId,
+                taskId: task.id,
+                log: JSON.stringify(event),
+                stream: 'stdout',
+              })
+            } catch {
+              // Fallback for non-JSON lines (startup messages, etc.)
+              if (line.trim()) {
+                executionBus.emit({
+                  type: 'task_log',
+                  projectId,
+                  taskId: task.id,
+                  log: line,
+                  stream: 'stdout',
+                })
+              }
+            }
+          }
         },
         onStderr: (chunk) => {
+          console.log(`[GEMINI] stderr: ${chunk.slice(0, 100)}`)
           executionBus.emit({
             type: 'task_log',
             projectId,
@@ -291,10 +324,13 @@ async function runTaskExecution(
     )
 
     const prUrl = extractPrUrl(`${result.stdout}\n${result.stderr}`)
+    console.log(`[ORCHESTRATOR] Gemini CLI finished - exitCode: ${result.exitCode}, prUrl: ${prUrl ?? 'none'}`)
 
     if (result.exitCode === 0) {
+      console.log(`[ORCHESTRATOR] Task completed successfully`)
       await completeTask(projectId, task.id, { success: true, prUrl })
     } else {
+      console.log(`[ORCHESTRATOR] Task failed - stderr: ${result.stderr?.slice(0, 200)}`)
       await completeTask(projectId, task.id, {
         success: false,
         error: result.stderr || 'Command exited with non-zero status',
@@ -303,6 +339,7 @@ async function runTaskExecution(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`[ORCHESTRATOR] Task execution error: ${message}`)
     await completeTask(projectId, task.id, {
       success: false,
       error: message,

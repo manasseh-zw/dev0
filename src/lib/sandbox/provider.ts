@@ -72,6 +72,8 @@ export async function getOrCreateProjectSandbox(
   projectId: string,
   taskId?: string,
 ): Promise<SandboxInstance> {
+  console.log(`[SANDBOX] getOrCreateProjectSandbox - projectId: ${projectId}, taskId: ${taskId ?? 'none'}`)
+  
   const existing = await db
     .select()
     .from(sandboxes)
@@ -81,6 +83,7 @@ export async function getOrCreateProjectSandbox(
     .limit(1)
 
   if (existing[0]) {
+    console.log(`[SANDBOX] Found existing sandbox: ${existing[0].id}`)
     const daytona = getDaytonaClient()
     try {
       await daytona.get(existing[0].daytonaId)
@@ -106,6 +109,7 @@ export async function getOrCreateProjectSandbox(
     }
   }
 
+  console.log(`[SANDBOX] Creating new sandbox...`)
   const project = await getProjectRecord(projectId)
 
   return createSandbox({
@@ -166,7 +170,7 @@ export async function executeCommandStreaming(
     const response = await sandbox.process.executeSessionCommand(
       sessionId,
       { command: fullCommand, runAsync: true },
-      options?.timeout,
+      options?.timeout ?? 600000, // 10 minutes default for long-running AI tasks
     )
 
     const cmdId = response.cmdId ?? (response as { cmd_id?: string }).cmd_id
@@ -260,10 +264,13 @@ export async function executeGeminiStreaming(
     onOutput,
   } = options
 
+  console.log(`[SANDBOX] executeGeminiStreaming - model: ${model}, cwd: ${cwd ?? 'default'}, prompt length: ${prompt.length}`)
+
   const geminiCmd = [
     'gemini',
     yolo ? '--yolo' : '',
     `--model ${model}`,
+    '--output-format stream-json', // Structured JSONL output for real-time events
     `-p "${prompt.replace(/"/g, '\\"')}"`,
   ]
     .filter(Boolean)

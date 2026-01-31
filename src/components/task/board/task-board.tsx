@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from '@tanstack/react-router';
 import { LayoutGroup } from 'motion/react';
 import type { TaskStatus, TaskWithBlocked } from '@/lib/types';
 import { updateTaskModel, startExecution } from '@/lib/actions';
+import { useExecutionEvents } from '@/lib/hooks/use-execution-events';
 import { statuses } from '@/components/task/mock-data/statuses';
 import { TaskColumn } from './task-column';
 import { TaskSheet } from '@/components/task/sheet';
@@ -11,16 +13,32 @@ import { TaskSheet } from '@/components/task/sheet';
 type TaskBoardProps = {
   /** Tasks with isBlocked pre-computed (from server action or mock data) */
   tasks: TaskWithBlocked[];
-  /** Project ID for SSE connection */
-  projectId?: string;
+  /** Project ID for SSE connection (required for real projects) */
+  projectId: string;
 };
 
 type GeminiModel = 'gemini-3-flash-preview' | 'gemini-3-pro-preview';
 
 export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
+  const router = useRouter();
   const [items, setItems] = React.useState<TaskWithBlocked[]>(tasks);
   const [selectedTask, setSelectedTask] = React.useState<TaskWithBlocked | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+
+  // Subscribe to execution events for real-time updates
+  useExecutionEvents(projectId, {
+    enabled: Boolean(projectId) && projectId !== 'mock',
+    onEvent: (event) => {
+      // On task status changes, revalidate from server (single source of truth)
+      if (
+        event.type === 'task_started' ||
+        event.type === 'task_completed' ||
+        event.type === 'task_failed'
+      ) {
+        router.invalidate();
+      }
+    },
+  });
 
   React.useEffect(() => {
     setItems(tasks);
@@ -35,6 +53,7 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
 
   // Group tasks by status
   const tasksByStatus = React.useMemo(() => groupTasksByStatus(items), [items]);
+
 
   const handleModelChange = React.useCallback(
     async (taskId: string, model: GeminiModel) => {
