@@ -1,8 +1,10 @@
 import type { InferSelectModel } from 'drizzle-orm'
-import { taskStatusEnum, tasks } from '@/lib/db/schema'
+import { taskStatusEnum, tasks, taskLogs } from '@/lib/db/schema'
+import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
 
 export type Task = InferSelectModel<typeof tasks>
 export type TaskStatus = (typeof taskStatusEnum.enumValues)[number]
+export type TaskExecutionLog = InferSelectModel<typeof taskLogs>
 
 export type CreateTaskData = {
   projectId: string
@@ -30,3 +32,20 @@ export type TaskWithProject = Task & {
 export type TaskWithBlocked = Task & {
   isBlocked: boolean
 }
+
+/**
+ * Task with execution logs relation (for task details view).
+ * Logs are lazy-loaded when viewing task details to avoid loading
+ * large payloads when listing tasks.
+ */
+export type TaskWithLogs = Task & {
+  executionLogs?: {
+    id: string
+    events: GeminiStreamEvent[]
+    summary: string | null
+    totalTokens: number | null
+    durationMs: number | null
+    toolCallsCount: number | null
+  } | null
+}
+

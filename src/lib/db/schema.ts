@@ -129,6 +129,34 @@ export const sandboxes = pgTable(
   ],
 )
 
+// Task execution logs - stored separately for lazy loading
+export const taskLogs = pgTable(
+  'task_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' })
+      .unique(),
+    events: jsonb('events')
+      .$type<import('@/lib/types/gemini-stream').GeminiStreamEvent[]>()
+      .notNull()
+      .default([]),
+    summary: text('summary'), // Last assistant message or completion summary
+    totalTokens: integer('total_tokens'),
+    durationMs: integer('duration_ms'),
+    toolCallsCount: integer('tool_calls_count').default(0),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('task_logs_task_id_idx').on(table.taskId)],
+)
+
 export const projectRelations = relations(projects, ({ many }) => ({
   tasks: many(tasks),
   sandboxes: many(sandboxes),
@@ -143,6 +171,10 @@ export const taskRelations = relations(tasks, ({ one }) => ({
     fields: [tasks.id],
     references: [sandboxes.taskId],
   }),
+  executionLogs: one(taskLogs, {
+    fields: [tasks.id],
+    references: [taskLogs.taskId],
+  }),
 }))
 
 export const sandboxRelations = relations(sandboxes, ({ one }) => ({
@@ -152,6 +184,13 @@ export const sandboxRelations = relations(sandboxes, ({ one }) => ({
   }),
   task: one(tasks, {
     fields: [sandboxes.taskId],
+    references: [tasks.id],
+  }),
+}))
+
+export const taskLogsRelations = relations(taskLogs, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskLogs.taskId],
     references: [tasks.id],
   }),
 }))

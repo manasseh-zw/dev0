@@ -10,17 +10,29 @@ export const Route = createFileRoute('/api/events/$projectId')({
         const stream = new ReadableStream({
           start(controller) {
             const encoder = new TextEncoder()
+            let isClosed = false
 
             const unsubscribe = executionBus.subscribe(projectId, (event) => {
-              const data = `data: ${JSON.stringify(event)}\n\n`
-              controller.enqueue(encoder.encode(data))
+              if (isClosed) return
+              
+              try {
+                const data = `data: ${JSON.stringify(event)}\n\n`
+                controller.enqueue(encoder.encode(data))
+              } catch (error) {
+                // Controller was closed, stop trying to enqueue
+                isClosed = true
+                console.log(`[SSE] Stream closed for project ${projectId}`)
+              }
             })
 
-            ;(controller as { _unsubscribe?: () => void })._unsubscribe =
-              unsubscribe
+            // Store for cleanup
+            ;(controller as { _cleanup?: () => void })._cleanup = () => {
+              isClosed = true
+              unsubscribe()
+            }
           },
           cancel(controller) {
-            ;(controller as { _unsubscribe?: () => void })._unsubscribe?.()
+            ;(controller as { _cleanup?: () => void })._cleanup?.()
           },
         })
 

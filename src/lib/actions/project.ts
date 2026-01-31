@@ -7,7 +7,7 @@ import {
   type ProjectSpec,
 } from '@/lib/ai'
 import { db } from '@/lib/db'
-import { projects, tasks } from '@/lib/db/schema'
+import { projects, tasks, taskLogs } from '@/lib/db/schema'
 import { createProjectRepository } from '@/lib/git'
 import type { TechStack } from '@/lib/templates'
 import { randomUUID } from 'crypto'
@@ -288,6 +288,46 @@ export const getTask = createServerFn({ method: 'GET' })
         repoName: row.projectRepoName ?? null,
         repoUrl: row.projectRepoUrl ?? null,
       },
+    }
+  })
+
+/**
+ * Get a single task by ID with its execution logs.
+ * Use this for task details view where logs need to be displayed.
+ */
+export const getTaskWithLogs = createServerFn({ method: 'GET' })
+  .inputValidator(z.object({ taskId: z.string() }))
+  .handler(async ({ data }: { data: { taskId: string } }) => {
+    const rows = await db
+      .select({
+        task: tasks,
+        projectId: projects.id,
+        projectName: projects.name,
+        projectRepoName: projects.repoName,
+        projectRepoUrl: projects.repoUrl,
+        executionLogs: taskLogs,
+      })
+      .from(tasks)
+      .leftJoin(projects, eq(tasks.projectId, projects.id))
+      .leftJoin(taskLogs, eq(tasks.id, taskLogs.taskId))
+      .where(eq(tasks.id, data.taskId))
+      .limit(1)
+
+    const row = rows[0]
+
+    if (!row) {
+      throw new Error('Task not found')
+    }
+
+    return {
+      ...row.task,
+      project: {
+        id: row.projectId ?? '',
+        name: row.projectName ?? '',
+        repoName: row.projectRepoName ?? null,
+        repoUrl: row.projectRepoUrl ?? null,
+      },
+      executionLogs: row.executionLogs,
     }
   })
 

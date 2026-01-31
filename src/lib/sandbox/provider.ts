@@ -15,6 +15,30 @@ import type {
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
+function escapeForDoubleQuotes(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`')
+}
+
+function escapeForSingleQuotes(value: string): string {
+  return value.replace(/'/g, `'\"'\"'`)
+}
+
+function buildProjectCloneUrl(project: {
+  repoName?: string | null
+  repoUrl?: string | null
+}): string | null {
+  if (project.repoName) {
+    const owner = env.GITHUB_BOT_USERNAME
+    return `https://github.com/${owner}/${project.repoName}.git`
+  }
+
+  if (project.repoUrl) {
+    return project.repoUrl
+  }
+
+  return null
+}
+
 const SNAPSHOT_NAME = 'dev0-universal'
 
 export async function createSandbox(
@@ -22,6 +46,8 @@ export async function createSandbox(
 ): Promise<SandboxInstance> {
   const daytona = getDaytonaClient()
   const template = getTemplate(config.techStack)
+  const project = await getProjectRecord(config.projectId)
+  const projectCloneUrl = buildProjectCloneUrl(project)
 
   const sandbox = await daytona.create({
     snapshot: SNAPSHOT_NAME,
@@ -36,14 +62,43 @@ export async function createSandbox(
     await sandbox.process.executeCommand(`export ${key}="${value}"`)
   }
 
+  const geminiSettings = JSON.stringify({
+    mcpServers: {
+      context7: {
+        httpUrl: 'https://mcp.context7.com/mcp',
+        headers: {
+          CONTEXT7_API_KEY: env.CONTEXT7_API_KEY,
+          Accept: 'application/json',
+        },
+      },
+    },
+  })
+  const geminiEnvContent = `GEMINI_API_KEY="${env.AGENT_GEMINI_API_KEY}"`
+  await sandbox.process.executeCommand(
+    `mkdir -p /home/daytona/.gemini && echo '${escapeForSingleQuotes(
+      geminiSettings,
+    )}' > /home/daytona/.gemini/settings.json && echo '${escapeForSingleQuotes(
+      geminiEnvContent,
+    )}' > /home/daytona/.gemini/.env`,
+  )
+
+  const cloneSource = projectCloneUrl ?? template.repoUrl
   const cloneResult = await sandbox.process.executeCommand(
-    `git clone ${template.repoUrl} /home/daytona/workspace/project && cd /home/daytona/workspace/project`,
+    `git clone '${escapeForSingleQuotes(
+      cloneSource,
+    )}' /home/daytona/workspace/project && cd /home/daytona/workspace/project`,
   )
 
   if (cloneResult.exitCode !== 0) {
     await daytona.delete(sandbox)
     throw new Error(`Failed to clone template: ${cloneResult.result}`)
   }
+
+  await sandbox.process.executeCommand(
+    `mkdir -p /home/daytona/workspace/project/.gemini && echo '${escapeForSingleQuotes(
+      geminiSettings,
+    )}' > /home/daytona/workspace/project/.gemini/settings.json`,
+  )
 
   const [dbSandbox] = await db
     .insert(sandboxes)
@@ -157,30 +212,38 @@ export async function executeCommandStreaming(
   const daytona = getDaytonaClient()
   const dbSandbox = await getSandboxRecord(sandboxId)
 
+  console.log(`[SANDBOX] executeCommandStreaming - getting sandbox ${dbSandbox.daytonaId}`)
   const sandbox = await daytona.get(dbSandbox.daytonaId)
+  console.log(`[SANDBOX] Got sandbox, preparing command...`)
 
   const fullCommand = options?.cwd ? `cd ${options.cwd} && ${command}` : command
 
   const startTime = Date.now()
   const sessionId = `exec-${randomUUID()}`
 
+  console.log(`[SANDBOX] Creating session ${sessionId}...`)
   await sandbox.process.createSession(sessionId)
+  console.log(`[SANDBOX] Session created successfully`)
 
   try {
+    console.log(`[SANDBOX] Executing session command (async mode)...`)
     const response = await sandbox.process.executeSessionCommand(
       sessionId,
       { command: fullCommand, runAsync: true },
       options?.timeout ?? 600000, // 10 minutes default for long-running AI tasks
     )
+    console.log(`[SANDBOX] Session command started, response:`, JSON.stringify(response))
 
     const cmdId = response.cmdId ?? (response as { cmd_id?: string }).cmd_id
     if (!cmdId) {
       throw new Error('Failed to start session command')
     }
+    console.log(`[SANDBOX] Command ID: ${cmdId}`)
 
     let stdout = ''
     let stderr = ''
 
+    console.log(`[SANDBOX] Starting log streaming...`)
     await sandbox.process.getSessionCommandLogs(
       sessionId,
       cmdId,
@@ -195,7 +258,9 @@ export async function executeCommandStreaming(
         options?.onOutput?.(chunk)
       },
     )
+    console.log(`[SANDBOX] Log streaming completed`)
 
+    console.log(`[SANDBOX] Getting command exit code...`)
     const commandInfo = await sandbox.process.getSessionCommand(
       sessionId,
       cmdId,
@@ -207,10 +272,12 @@ export async function executeCommandStreaming(
     if (typeof exitCode !== 'number') {
       throw new Error('Failed to retrieve session command exit code')
     }
+    console.log(`[SANDBOX] Command exit code: ${exitCode}`)
 
     options?.onComplete?.(exitCode)
 
     const duration = Date.now() - startTime
+    console.log(`[SANDBOX] Command completed in ${duration}ms`)
 
     return {
       exitCode,
@@ -218,11 +285,17 @@ export async function executeCommandStreaming(
       stderr,
       duration,
     }
+  } catch (error) {
+    console.error(`[SANDBOX] Error in executeCommandStreaming:`, error)
+    throw error
   } finally {
     try {
+      console.log(`[SANDBOX] Cleaning up session ${sessionId}...`)
       await sandbox.process.deleteSession(sessionId)
+      console.log(`[SANDBOX] Session deleted`)
     } catch (error) {
       // Best-effort cleanup; avoid masking the original error.
+      console.error(`[SANDBOX] Error deleting session:`, error)
     }
   }
 }
@@ -240,10 +313,11 @@ export async function executeGemini(
   } = options
 
   const geminiCmd = [
+    `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
     'gemini',
     yolo ? '--yolo' : '',
     `--model ${model}`,
-    `-p "${prompt.replace(/"/g, '\\"')}"`,
+    `-p "${escapeForDoubleQuotes(prompt)}"`,
   ]
     .filter(Boolean)
     .join(' ')
@@ -267,11 +341,12 @@ export async function executeGeminiStreaming(
   console.log(`[SANDBOX] executeGeminiStreaming - model: ${model}, cwd: ${cwd ?? 'default'}, prompt length: ${prompt.length}`)
 
   const geminiCmd = [
+    `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
     'gemini',
     yolo ? '--yolo' : '',
     `--model ${model}`,
     '--output-format stream-json', // Structured JSONL output for real-time events
-    `-p "${prompt.replace(/"/g, '\\"')}"`,
+    `-p "${escapeForDoubleQuotes(prompt)}"`,
   ]
     .filter(Boolean)
     .join(' ')

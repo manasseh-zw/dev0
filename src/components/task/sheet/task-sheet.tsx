@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import type { Task } from '@/lib/types'
+import type { TaskWithLogs } from '@/lib/types/task'
 import {
   Sheet,
   SheetContent,
@@ -16,7 +16,7 @@ import { TaskLogs } from '@/components/task/sheet/task-logs'
 import { statuses } from '@/components/task/mock-data/statuses'
 
 interface TaskSheetProps {
-  task: Task | null
+  task: TaskWithLogs | null
   open: boolean
   onOpenChange: (open: boolean) => void
   projectId?: string
@@ -35,7 +35,8 @@ export function TaskSheet({ task, open, onOpenChange, projectId }: TaskSheetProp
   if (!task) return null
 
   const status = statuses.find((s) => s.id === task.status) ?? statuses[0]
-  const hasLogs = task.status !== 'PENDING' && (task.logs?.length ?? 0) > 0
+  // Check for logs in executionLogs relation (new) or old logs column
+  const hasLogs = task.status !== 'PENDING' && ((task.executionLogs?.events?.length ?? 0) > 0 || (task.logs?.length ?? 0) > 0)
   const isRunning = task.status === 'RUNNING'
   const logsDisabled = task.status === 'PENDING'
 

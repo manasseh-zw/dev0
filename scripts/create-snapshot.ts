@@ -59,20 +59,19 @@ function validateEnv() {
  */
 function generateGeminiSettings(): string {
   const settings = {
+    selectedAuthType: "gemini-api-key", // Critical for headless/non-interactive use
     mcpServers: {
       context7: {
-        httpUrl: 'https://mcp.context7.com/mcp',
+        url: 'https://mcp.context7.com/mcp', // standard field is 'url'
         headers: {
-          CONTEXT7_API_KEY: CONTEXT7_API_KEY,
-          Accept: 'application/json'
+          'x-api-key': CONTEXT7_API_KEY, // verify exact header with context7 docs
+          'Accept': 'application/json'
         }
       }
     }
   }
-  // Return minified JSON (no newlines) with escaped quotes for shell
   return JSON.stringify(settings)
 }
-
 async function createSnapshot() {
   // Validate environment variables before proceeding
   validateEnv()
@@ -99,35 +98,25 @@ async function createSnapshot() {
 
   // Generate configurations (single-line, shell-safe)
   const geminiSettings = generateGeminiSettings()
-  const geminiEnvContent = `GEMINI_API_KEY="${AGENT_GEMINI_API_KEY}"`
+
 
   const universalImage = Image.base('oven/bun:1.3')
-    // Install system dependencies (including jq for JSON manipulation)
-    .runCommands('apt-get update && apt-get install -y git curl sudo jq')
-    // Install GitHub CLI
-    // https://github.com/cli/cli/blob/trunk/docs/install_linux.md
-    .runCommands('curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg')
-    .runCommands('chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg')
-    .runCommands('echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null')
-    .runCommands('apt-get update && apt-get install -y gh')
-    // Install Gemini CLI globally
-    .runCommands('bun install -g @google/gemini-cli')
-    // Create Gemini CLI config directory
-    .runCommands('mkdir -p ~/.gemini')
-    // Create Gemini settings.json with Context7 MCP
-    // Use echo with the JSON directly (single line, properly escaped)
-    .runCommands(`echo '${geminiSettings}' > ~/.gemini/settings.json`)
-    // Create Gemini CLI .env for API key authentication (headless/YOLO mode)
-    .runCommands(`echo '${geminiEnvContent}' > ~/.gemini/.env`)
-    // Setup workspace directory
-    .runCommands(`mkdir -p ${WORKING_DIR}`)
+    .env({
+      GEMINI_API_KEY: AGENT_GEMINI_API_KEY!,
+      CONTEXT7_API_KEY: CONTEXT7_API_KEY!
+    })
+    .runCommands(
+      'apt-get update && apt-get install -y git curl sudo jq procps',
+      'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg',
+      'chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg',
+      'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null',
+      'apt-get update && apt-get install -y gh',
+      'bun install -g @google/gemini-cli',
+      'mkdir -p ~/.gemini',
+      `echo '${geminiSettings}' > ~/.gemini/settings.json`,
+      `mkdir -p ${WORKING_DIR}`
+    )
     .workdir(WORKING_DIR)
-    // Verify installations
-    .runCommands('bun --version && git --version && gh --version && gemini --version && jq --version')
-    // Verify and pretty-print Gemini configuration
-    .runCommands('echo "=== Gemini Settings ===" && cat ~/.gemini/settings.json | jq .')
-    .runCommands('echo "=== Gemini Env ===" && cat ~/.gemini/.env')
-
   console.log('Building snapshot (this may take a few minutes)...\n')
 
   // Handle process termination gracefully

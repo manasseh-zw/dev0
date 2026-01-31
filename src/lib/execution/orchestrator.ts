@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { projects, tasks } from '@/lib/db/schema'
+import { projects, tasks, taskLogs } from '@/lib/db/schema'
 import { executionBus } from '@/lib/execution/event-bus'
 import {
   executeGeminiStreaming,
   getOrCreateProjectSandbox,
 } from '@/lib/sandbox/provider'
 import type { Task } from '@/lib/types/task'
+import { isGeminiEvent, type GeminiStreamEvent } from '@/lib/types/gemini-stream'
 
 type ProjectRunState = {
   runningTaskId: string | null
@@ -268,11 +269,15 @@ async function runTaskExecution(
 ): Promise<void> {
   console.log(`[ORCHESTRATOR] runTaskExecution started - task: ${task.title}`)
   
+  // Collect events for persistence
+  const collectedEvents: GeminiStreamEvent[] = []
+  
   try {
     const project = await getProjectById(projectId)
     const prompt = buildTaskPrompt(project, task)
     console.log(`[ORCHESTRATOR] Built prompt, executing Gemini CLI...`)
 
+    let stdoutBuffer = ''
     const result = await executeGeminiStreaming(
       sandboxId,
       {
@@ -284,17 +289,27 @@ async function runTaskExecution(
       {
         onStdout: (chunk) => {
           // Parse JSONL events from --output-format stream-json
-          for (const line of chunk.split('\n')) {
+          stdoutBuffer += chunk
+          const lines = stdoutBuffer.split('\n')
+          stdoutBuffer = lines.pop() ?? ''
+          for (const line of lines) {
             if (!line.trim()) continue
             try {
-              const event = JSON.parse(line)
-              console.log(`[GEMINI] Event: ${event.type}`)
+              const parsed = JSON.parse(line)
+              const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
+              
+              if (geminiEvent) {
+                console.log(`[GEMINI] Event: ${geminiEvent.type}`)
+                collectedEvents.push(geminiEvent)
+              }
+              
               executionBus.emit({
                 type: 'task_log',
                 projectId,
                 taskId: task.id,
-                log: JSON.stringify(event),
+                log: line,
                 stream: 'stdout',
+                geminiEvent,
               })
             } catch {
               // Fallback for non-JSON lines (startup messages, etc.)
@@ -320,8 +335,41 @@ async function runTaskExecution(
             stream: 'stderr',
           })
         },
+        onComplete: () => {
+          if (!stdoutBuffer.trim()) return
+          const line = stdoutBuffer.trim()
+          stdoutBuffer = ''
+          try {
+            const parsed = JSON.parse(line)
+            const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
+            
+            if (geminiEvent) {
+              collectedEvents.push(geminiEvent)
+            }
+            
+            executionBus.emit({
+              type: 'task_log',
+              projectId,
+              taskId: task.id,
+              log: line,
+              stream: 'stdout',
+              geminiEvent,
+            })
+          } catch {
+            executionBus.emit({
+              type: 'task_log',
+              projectId,
+              taskId: task.id,
+              log: line,
+              stream: 'stdout',
+            })
+          }
+        },
       },
     )
+
+    // Persist logs to database
+    await persistTaskLogs(task.id, collectedEvents, result.duration)
 
     const prUrl = extractPrUrl(`${result.stdout}\n${result.stderr}`)
     console.log(`[ORCHESTRATOR] Gemini CLI finished - exitCode: ${result.exitCode}, prUrl: ${prUrl ?? 'none'}`)
@@ -340,10 +388,69 @@ async function runTaskExecution(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error(`[ORCHESTRATOR] Task execution error: ${message}`)
+    
+    // Persist any collected events even on error
+    if (collectedEvents.length > 0) {
+      await persistTaskLogs(task.id, collectedEvents, 0).catch(() => {
+        // Ignore persistence errors during error handling
+      })
+    }
+    
     await completeTask(projectId, task.id, {
       success: false,
       error: message,
     })
+  }
+}
+
+/**
+ * Persist Gemini CLI events to the task_logs table
+ */
+async function persistTaskLogs(
+  taskId: string,
+  events: GeminiStreamEvent[],
+  durationMs: number,
+): Promise<void> {
+  if (events.length === 0) return
+
+  // Extract stats from the result event if present
+  const resultEvent = events.find((e) => e.type === 'result')
+  const stats = resultEvent?.type === 'result' ? resultEvent.stats : undefined
+  
+  // Find the last assistant message for summary
+  const lastMessage = [...events]
+    .reverse()
+    .find((e) => e.type === 'message' && e.role === 'assistant')
+  const summary = lastMessage?.type === 'message' ? lastMessage.content : undefined
+  
+  // Count tool calls
+  const toolCallsCount = events.filter((e) => e.type === 'tool_use').length
+
+  try {
+    await db
+      .insert(taskLogs)
+      .values({
+        taskId,
+        events,
+        summary: summary?.slice(0, 2000), // Truncate long summaries
+        totalTokens: stats?.total_tokens ?? null,
+        durationMs: stats?.duration_ms ?? durationMs,
+        toolCallsCount,
+      })
+      .onConflictDoUpdate({
+        target: taskLogs.taskId,
+        set: {
+          events,
+          summary: summary?.slice(0, 2000),
+          totalTokens: stats?.total_tokens ?? null,
+          durationMs: stats?.duration_ms ?? durationMs,
+          toolCallsCount,
+          updatedAt: new Date(),
+        },
+      })
+    console.log(`[ORCHESTRATOR] Persisted ${events.length} events for task ${taskId}`)
+  } catch (error) {
+    console.error(`[ORCHESTRATOR] Failed to persist task logs: ${error}`)
   }
 }
 

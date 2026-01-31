@@ -1,5 +1,6 @@
 import * as React from 'react'
 import type { ExecutionEvent } from '@/lib/execution/event-bus'
+import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
 
 export type ExecutionLogEntry = {
   id: string
@@ -7,6 +8,7 @@ export type ExecutionLogEntry = {
   taskId: string
   stream: 'stdout' | 'stderr'
   message: string
+  geminiEvent?: GeminiStreamEvent
 }
 
 type UseExecutionEventsOptions = {
@@ -33,6 +35,7 @@ function createLogEntry(
     taskId: event.taskId,
     stream: event.stream,
     message: event.log,
+    geminiEvent: event.geminiEvent,
   }
 }
 

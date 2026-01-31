@@ -1,23 +1,19 @@
 'use client'
 
 import * as React from 'react'
-import type { Task } from '@/lib/types'
+import type { TaskWithLogs } from '@/lib/types/task'
 import { useExecutionEvents, type ExecutionLogEntry } from '@/lib/hooks/use-execution-events'
 import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { CommandLineIcon } from '@hugeicons/core-free-icons'
+import { GeminiEventRenderer } from './gemini-event-renderer'
+import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
 
 interface TaskLogsProps {
-  task: Task
+  task: TaskWithLogs
   projectId?: string
   isRunning: boolean
   hasLogs: boolean
-}
-
-interface LogEntry {
-  timestamp: string
-  level: 'info' | 'warn' | 'error' | 'success'
-  message: string
 }
 
 export function TaskLogs({ task, projectId, isRunning, hasLogs }: TaskLogsProps) {
@@ -58,18 +54,18 @@ export function TaskLogs({ task, projectId, isRunning, hasLogs }: TaskLogsProps)
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [allLiveLogs, task.logs])
+  }, [allLiveLogs, task.executionLogs])
 
   // Reset live logs when task changes
   React.useEffect(() => {
     setLiveLogs([])
   }, [task.id])
 
-  // Historical logs from task data
-  const historicalLogs = (task.logs as LogEntry[] | null) ?? []
+  // Historical Gemini events from task.executionLogs relation
+  const historicalEvents: GeminiStreamEvent[] = task.executionLogs?.events ?? []
 
   // No logs state
-  if (!isRunning && !hasLogs) {
+  if (!isRunning && !hasLogs && historicalEvents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-12">
         <div className="size-12 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -93,31 +89,31 @@ export function TaskLogs({ task, projectId, isRunning, hasLogs }: TaskLogsProps)
   return (
     <div
       ref={scrollRef}
-      className="h-full overflow-y-auto font-mono text-xs bg-muted/30 rounded-lg p-3 space-y-1"
+      className="h-full overflow-y-auto bg-muted/30 rounded-lg p-4 space-y-1"
     >
-      {/* Show historical logs for completed tasks */}
-      {!isRunning && historicalLogs.map((log, index) => (
-        <LogLine
-          key={`hist-${index}`}
-          timestamp={log.timestamp}
-          level={log.level}
-          message={log.message}
-        />
+      {/* Show historical Gemini events for completed tasks */}
+      {!isRunning && historicalEvents.map((event, index) => (
+        <GeminiEventRenderer key={`hist-${index}`} event={event} />
       ))}
 
       {/* Show live logs for running tasks */}
       {isRunning && allLiveLogs.map((log) => (
-        <LogLine
-          key={log.id}
-          timestamp={log.timestamp}
-          level={log.stream === 'stderr' ? 'error' : 'info'}
-          message={log.message}
-        />
+        <div key={log.id}>
+          {log.geminiEvent ? (
+            <GeminiEventRenderer event={log.geminiEvent} />
+          ) : (
+            <LogLine
+              timestamp={log.timestamp}
+              level={log.stream === 'stderr' ? 'error' : 'info'}
+              message={log.message}
+            />
+          )}
+        </div>
       ))}
 
       {/* Running indicator */}
       {isRunning && allLiveLogs.length === 0 && (
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span className="size-2 rounded-full bg-green-500 animate-pulse" />
           <span>Waiting for logs...</span>
         </div>
@@ -145,7 +141,7 @@ function LogLine({
   return (
     <div
       className={cn(
-        'flex gap-2 leading-relaxed',
+        'flex gap-2 leading-relaxed font-mono text-xs',
         level === 'error' && 'text-red-500',
         level === 'warn' && 'text-amber-500',
         level === 'success' && 'text-green-500',

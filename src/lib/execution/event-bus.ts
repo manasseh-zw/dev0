@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
 
 export type ExecutionEvent =
   | {
@@ -13,6 +14,7 @@ export type ExecutionEvent =
       taskId: string
       log: string
       stream: 'stdout' | 'stderr'
+      geminiEvent?: GeminiStreamEvent
     }
   | {
       type: 'task_completed'
