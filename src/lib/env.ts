@@ -34,7 +34,6 @@ export const env = {
 
   // E2B
   E2B_API_KEY: requireEnv('E2B_API_KEY'),
-  E2B_DOMAIN: optionalEnv('E2B_DOMAIN', ''),
   E2B_TEMPLATE: optionalEnv('E2B_TEMPLATE', 'dev0-universal'),
   E2B_SANDBOX_TIMEOUT_MS: optionalEnv('E2B_SANDBOX_TIMEOUT_MS', '3600000'),
 

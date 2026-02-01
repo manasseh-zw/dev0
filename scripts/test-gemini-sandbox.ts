@@ -25,7 +25,6 @@ const WORKSPACE_DIR = '/workspace/project'
 const HOME_DIR = '/root'
 
 const E2B_API_KEY = process.env.E2B_API_KEY
-const E2B_DOMAIN = process.env.E2B_DOMAIN
 const AGENT_GEMINI_API_KEY = process.env.AGENT_GEMINI_API_KEY
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 const GEMINI_DEBUG = process.env.GEMINI_DEBUG
@@ -97,7 +96,6 @@ function reportEnv(keys: string[]) {
 async function main() {
   reportEnv([
     'E2B_API_KEY',
-    'E2B_DOMAIN',
     'AGENT_GEMINI_API_KEY',
     'GITHUB_TOKEN',
     'GEMINI_DEBUG',
@@ -110,7 +108,6 @@ async function main() {
 
   const sandbox = await Sandbox.create(TEMPLATE_NAME, {
     apiKey: E2B_API_KEY!,
-    ...(E2B_DOMAIN ? { domain: E2B_DOMAIN } : {}),
     envs: {
       GH_TOKEN: GITHUB_TOKEN!,
       GITHUB_TOKEN: GITHUB_TOKEN!,
