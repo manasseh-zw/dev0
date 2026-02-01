@@ -1,10 +1,21 @@
-import { Daytona } from '@daytonaio/sdk'
+import { env } from '@/lib/env'
 
-let daytonaClient: Daytona | null = null
+export type E2bConnectionOpts = {
+  apiKey: string
+  domain?: string
+  debug?: boolean
+  requestTimeoutMs?: number
+}
 
-export function getDaytonaClient(): Daytona {
-  if (!daytonaClient) {
-    daytonaClient = new Daytona()
+export function getE2bConnectionOpts(): E2bConnectionOpts {
+  const domain = env.E2B_DOMAIN.trim()
+  return {
+    apiKey: env.E2B_API_KEY,
+    ...(domain ? { domain } : {}),
   }
-  return daytonaClient
+}
+
+export function getE2bSandboxTimeoutMs(): number {
+  const parsed = Number(env.E2B_SANDBOX_TIMEOUT_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600000
 }

@@ -29,7 +29,7 @@ type CompletionResult = {
   error?: string
 }
 
-const WORKSPACE_DIR = '/home/daytona/workspace/project'
+const WORKSPACE_DIR = '/workspace/project'
 
 export async function startTask(
   projectId: string,

@@ -32,9 +32,11 @@ export const env = {
   // Database
   DATABASE_URL: requireEnv('DATABASE_URL'),
 
-  // Daytona
-  DAYTONA_API_KEY: requireEnv('DAYTONA_API_KEY'),
-  DAYTONA_API_URL: requireEnv('DAYTONA_API_URL'),
+  // E2B
+  E2B_API_KEY: requireEnv('E2B_API_KEY'),
+  E2B_DOMAIN: optionalEnv('E2B_DOMAIN', ''),
+  E2B_TEMPLATE: optionalEnv('E2B_TEMPLATE', 'dev0-universal'),
+  E2B_SANDBOX_TIMEOUT_MS: optionalEnv('E2B_SANDBOX_TIMEOUT_MS', '3600000'),
 
   // Google Gemini (AI SDK for our backend)
   GOOGLE_GENERATIVE_AI_API_KEY: requireEnv('GOOGLE_GENERATIVE_AI_API_KEY'),

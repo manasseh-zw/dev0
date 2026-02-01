@@ -110,7 +110,7 @@ export const sandboxes = pgTable(
     projectId: uuid('project_id')
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
-    daytonaId: text('daytona_id').notNull().unique(),
+    sandboxId: text('sandbox_id').notNull().unique(),
     status: sandboxStatusEnum('status').default('READY').notNull(),
     taskId: uuid('task_id').unique(),
     snapshotId: text('snapshot_id'),

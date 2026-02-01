@@ -49,7 +49,7 @@ describe('Sandbox Integration Test (Live)', () => {
     console.log('\n✅ Tests complete!\n')
   })
 
-  test('1. Create sandbox from snapshot', async () => {
+  test('1. Create sandbox from template', async () => {
     console.log('\n📦 Test 1: Creating sandbox...')
 
     const sandbox = await createSandbox({
@@ -59,12 +59,12 @@ describe('Sandbox Integration Test (Live)', () => {
 
     expect(sandbox).toBeDefined()
     expect(sandbox.id).toBeDefined()
-    expect(sandbox.daytonaId).toBeDefined()
+    expect(sandbox.sandboxId).toBeDefined()
     expect(sandbox.status).toBe('ready')
 
     sandboxId = sandbox.id
     console.log(`   ✅ Sandbox created: ${sandbox.id}`)
-    console.log(`   📍 Daytona ID: ${sandbox.daytonaId}`)
+    console.log(`   📍 Sandbox ID: ${sandbox.sandboxId}`)
   }, 180_000)
 
   test('2. Verify template was cloned', async () => {
@@ -74,8 +74,8 @@ describe('Sandbox Integration Test (Live)', () => {
 
     const result = await executeCommand(
       sandboxId,
-      'ls -la /home/daytona/workspace/project',
-      { cwd: '/home/daytona/workspace' },
+      'ls -la /workspace/project',
+      { cwd: '/workspace' },
     )
 
     expect(result.exitCode).toBe(0)
@@ -130,7 +130,7 @@ describe('Sandbox Integration Test (Live)', () => {
         'Create a file called HELLO.md with a simple greeting message that says "Hello from dev0 test!"',
       model: 'gemini-2.5-flash',
       yolo: true,
-      cwd: '/home/daytona/workspace/project',
+      cwd: '/workspace/project',
       onOutput: (data) => {
         logs.push(data)
         console.log(`   📡 ${data}`)
@@ -144,7 +144,7 @@ describe('Sandbox Integration Test (Live)', () => {
 
     const fileCheck = await executeCommand(
       sandboxId,
-      'cat /home/daytona/workspace/project/HELLO.md',
+      'cat /workspace/project/HELLO.md',
     )
 
     expect(fileCheck.exitCode).toBe(0)
@@ -176,7 +176,7 @@ The component should:
 Keep it simple and minimal. Do not install any packages.`,
       model: 'gemini-2.5-flash',
       yolo: true,
-      cwd: '/home/daytona/workspace/project',
+      cwd: '/workspace/project',
       onOutput: (data) => {
         logs.push(data)
         const preview =
@@ -193,7 +193,7 @@ Keep it simple and minimal. Do not install any packages.`,
     const fileCheck = await executeCommand(
       sandboxId,
       'cat src/components/todo-list.tsx',
-      { cwd: '/home/daytona/workspace/project' },
+      { cwd: '/workspace/project' },
     )
 
     expect(fileCheck.exitCode).toBe(0)

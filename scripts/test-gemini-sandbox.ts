@@ -1,6 +1,6 @@
 /**
  * End-to-end sandbox test:
- * - Create Daytona sandbox from snapshot
+ * - Create E2B sandbox from template
  * - Clone target repo
  * - Run Gemini CLI to implement a feature
  * - Create a PR via gh
@@ -9,11 +9,10 @@
  *   bun run scripts/test-gemini-sandbox.ts
  */
 
-import { Daytona } from '@daytonaio/sdk'
+import { CommandExitError, Sandbox } from 'e2b'
 import { config } from 'dotenv'
 import { existsSync } from 'fs'
 import { resolve } from 'path'
-import { randomUUID } from 'crypto'
 
 const envPath = resolve(process.cwd(), '.env.local')
 if (!existsSync(envPath)) {
@@ -21,11 +20,12 @@ if (!existsSync(envPath)) {
 }
 config({ path: envPath })
 
-const SNAPSHOT_NAME = 'dev0-universal'
-const WORKSPACE_DIR = '/home/daytona/workspace/project'
+const TEMPLATE_NAME = process.env.E2B_TEMPLATE ?? 'dev0-universal'
+const WORKSPACE_DIR = '/workspace/project'
+const HOME_DIR = '/root'
 
-const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY
-const DAYTONA_API_URL = process.env.DAYTONA_API_URL
+const E2B_API_KEY = process.env.E2B_API_KEY
+const E2B_DOMAIN = process.env.E2B_DOMAIN
 const AGENT_GEMINI_API_KEY = process.env.AGENT_GEMINI_API_KEY
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 const GEMINI_DEBUG = process.env.GEMINI_DEBUG
@@ -57,56 +57,32 @@ function escapeForDoubleQuotes(value: string): string {
 }
 
 async function runCommand(
-  sandbox: any,
+  sandbox: Sandbox,
   command: string,
   options?: { cwd?: string; timeoutMs?: number },
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const fullCommand = options?.cwd ? `cd ${options.cwd} && ${command}` : command
-  const sessionId = `exec-${randomUUID()}`
-  await sandbox.process.createSession(sessionId)
 
   try {
-    const response = await sandbox.process.executeSessionCommand(
-      sessionId,
-      { command: fullCommand, runAsync: true },
-      options?.timeoutMs ?? 600000,
-    )
-    const cmdId = response?.cmdId ?? response?.cmd_id
-    if (!cmdId) {
-      throw new Error('Failed to start session command')
-    }
-
-    let stdout = ''
-    let stderr = ''
-
-    await sandbox.process.getSessionCommandLogs(
-      sessionId,
-      cmdId,
-      (chunk: string) => {
-        stdout += chunk
+    const result = await sandbox.commands.run(fullCommand, {
+      timeoutMs: options?.timeoutMs ?? 600000,
+      onStdout: (chunk) => {
         process.stdout.write(chunk)
       },
-      (chunk: string) => {
-        stderr += chunk
+      onStderr: (chunk) => {
         process.stderr.write(chunk)
       },
-    )
-
-    const commandInfo = await sandbox.process.getSessionCommand(
-      sessionId,
-      cmdId,
-    )
-    const exitCode =
-      (commandInfo as { exitCode?: number }).exitCode ??
-      (commandInfo as { exit_code?: number }).exit_code
-
-    if (typeof exitCode !== 'number') {
-      throw new Error('Failed to retrieve session command exit code')
+    })
+    return result
+  } catch (error) {
+    if (error instanceof CommandExitError) {
+      return {
+        exitCode: error.exitCode,
+        stdout: error.stdout,
+        stderr: error.stderr,
+      }
     }
-
-    return { exitCode, stdout, stderr }
-  } finally {
-    await sandbox.process.deleteSession(sessionId).catch(() => undefined)
+    throw error
   }
 }
 
@@ -120,35 +96,40 @@ function reportEnv(keys: string[]) {
 
 async function main() {
   reportEnv([
-    'DAYTONA_API_KEY',
-    'DAYTONA_API_URL',
+    'E2B_API_KEY',
+    'E2B_DOMAIN',
     'AGENT_GEMINI_API_KEY',
     'GITHUB_TOKEN',
     'GEMINI_DEBUG',
     'GEMINI_FLAGS',
     'GEMINI_OUTPUT',
   ])
-  requireEnv('DAYTONA_API_KEY', DAYTONA_API_KEY)
-  requireEnv('DAYTONA_API_URL', DAYTONA_API_URL)
+  requireEnv('E2B_API_KEY', E2B_API_KEY)
   requireEnv('AGENT_GEMINI_API_KEY', AGENT_GEMINI_API_KEY)
   requireEnv('GITHUB_TOKEN', GITHUB_TOKEN)
 
-  const daytona = new Daytona()
-  const sandbox = await daytona.create({
-    snapshot: SNAPSHOT_NAME,
-    envVars: {
+  const sandbox = await Sandbox.create(TEMPLATE_NAME, {
+    apiKey: E2B_API_KEY!,
+    ...(E2B_DOMAIN ? { domain: E2B_DOMAIN } : {}),
+    envs: {
       GH_TOKEN: GITHUB_TOKEN!,
       GITHUB_TOKEN: GITHUB_TOKEN!,
       GEMINI_API_KEY: AGENT_GEMINI_API_KEY!,
       AGENT_GEMINI_API_KEY: AGENT_GEMINI_API_KEY!,
       ...(GEMINI_DEBUG ? { GEMINI_DEBUG } : {}),
     },
+    allowInternetAccess: true,
   })
 
   try {
     await runCommand(
       sandbox,
-      `git clone "${REPO_URL}" ${WORKSPACE_DIR} && cd ${WORKSPACE_DIR}`,
+      `mkdir -p ${HOME_DIR}/.gemini && echo '{"selectedAuthType":"gemini-api-key"}' > ${HOME_DIR}/.gemini/settings.json && echo 'GEMINI_API_KEY="${AGENT_GEMINI_API_KEY}"' > ${HOME_DIR}/.gemini/.env`,
+    )
+
+    await runCommand(
+      sandbox,
+      `GIT_TERMINAL_PROMPT=0 git clone "${REPO_URL}" ${WORKSPACE_DIR} && cd ${WORKSPACE_DIR}`,
     )
 
     await runCommand(
@@ -190,7 +171,7 @@ Please:
       throw new Error(`Gemini CLI failed (exit ${result.exitCode})`)
     }
   } finally {
-    await daytona.delete(sandbox).catch(() => undefined)
+    await sandbox.kill().catch(() => undefined)
   }
 }
 

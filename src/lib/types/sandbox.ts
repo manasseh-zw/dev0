@@ -9,7 +9,7 @@ export type CreateSandboxConfig = {
 
 export type SandboxInstance = {
   id: string
-  daytonaId: string
+  sandboxId: string
   status: 'ready' | 'running' | 'stopped' | 'error'
   publicUrl?: string
 }
@@ -70,7 +70,7 @@ export type TaskLog = {
 }
 
 export type SandboxEvent =
-  | { type: 'created'; sandboxId: string; daytonaId: string }
+  | { type: 'created'; sandboxId: string }
   | { type: 'ready'; sandboxId: string }
   | { type: 'command_start'; sandboxId: string; command: string }
   | { type: 'command_output'; sandboxId: string; output: string }
