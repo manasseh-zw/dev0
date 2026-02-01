@@ -7,7 +7,10 @@ import {
   getOrCreateProjectSandbox,
 } from '@/lib/sandbox/provider'
 import type { Task } from '@/lib/types/task'
-import { isGeminiEvent, type GeminiStreamEvent } from '@/lib/types/gemini-stream'
+import {
+  isGeminiEvent,
+  type GeminiStreamEvent,
+} from '@/lib/types/gemini-stream'
 
 type ProjectRunState = {
   runningTaskId: string | null
@@ -29,18 +32,22 @@ type CompletionResult = {
   error?: string
 }
 
-const WORKSPACE_DIR = '/workspace/project'
+const WORKSPACE_DIR = '$HOME/project'
 
 export async function startTask(
   projectId: string,
   taskId?: string,
 ): Promise<StartTaskResult> {
-  console.log(`[ORCHESTRATOR] startTask called - projectId: ${projectId}, taskId: ${taskId ?? 'auto'}`)
-  
+  console.log(
+    `[ORCHESTRATOR] startTask called - projectId: ${projectId}, taskId: ${taskId ?? 'auto'}`,
+  )
+
   const currentState = projectState.get(projectId)
 
   if (currentState?.runningTaskId || currentState?.starting) {
-    console.log(`[ORCHESTRATOR] Task already running for project ${projectId} - taskId: ${currentState?.runningTaskId}`)
+    console.log(
+      `[ORCHESTRATOR] Task already running for project ${projectId} - taskId: ${currentState?.runningTaskId}`,
+    )
     return {
       taskId: currentState?.runningTaskId ?? '',
       sandboxId: currentState?.sandboxId ?? '',
@@ -122,7 +129,9 @@ export async function startTask(
     let sandboxId = ''
 
     try {
-      console.log(`[ORCHESTRATOR] Getting or creating sandbox for project ${projectId}, task ${task.id}`)
+      console.log(
+        `[ORCHESTRATOR] Getting or creating sandbox for project ${projectId}, task ${task.id}`,
+      )
       const sandbox = await getOrCreateProjectSandbox(projectId, task.id)
       sandboxId = sandbox.id
       console.log(`[ORCHESTRATOR] Sandbox ready - sandboxId: ${sandboxId}`)
@@ -155,7 +164,9 @@ export async function startTask(
       starting: false,
     })
 
-    console.log(`[ORCHESTRATOR] Emitting task_started event for task ${task.id}`)
+    console.log(
+      `[ORCHESTRATOR] Emitting task_started event for task ${task.id}`,
+    )
     executionBus.emit({
       type: 'task_started',
       projectId,
@@ -188,8 +199,10 @@ export async function completeTask(
   taskId: string,
   result: CompletionResult,
 ): Promise<void> {
-  console.log(`[ORCHESTRATOR] completeTask called - taskId: ${taskId}, success: ${result.success}, prUrl: ${result.prUrl ?? 'none'}`)
-  
+  console.log(
+    `[ORCHESTRATOR] completeTask called - taskId: ${taskId}, success: ${result.success}, prUrl: ${result.prUrl ?? 'none'}`,
+  )
+
   if (result.success) {
     await db
       .update(tasks)
@@ -268,10 +281,10 @@ async function runTaskExecution(
   sandboxId: string,
 ): Promise<void> {
   console.log(`[ORCHESTRATOR] runTaskExecution started - task: ${task.title}`)
-  
+
   // Collect events for persistence
   const collectedEvents: GeminiStreamEvent[] = []
-  
+
   try {
     const project = await getProjectById(projectId)
     const prompt = buildTaskPrompt(project, task)
@@ -297,12 +310,12 @@ async function runTaskExecution(
             try {
               const parsed = JSON.parse(line)
               const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
-              
+
               if (geminiEvent) {
                 console.log(`[GEMINI] Event: ${geminiEvent.type}`)
                 collectedEvents.push(geminiEvent)
               }
-              
+
               executionBus.emit({
                 type: 'task_log',
                 projectId,
@@ -342,11 +355,11 @@ async function runTaskExecution(
           try {
             const parsed = JSON.parse(line)
             const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
-            
+
             if (geminiEvent) {
               collectedEvents.push(geminiEvent)
             }
-            
+
             executionBus.emit({
               type: 'task_log',
               projectId,
@@ -372,13 +385,17 @@ async function runTaskExecution(
     await persistTaskLogs(task.id, collectedEvents, result.duration)
 
     const prUrl = extractPrUrl(`${result.stdout}\n${result.stderr}`)
-    console.log(`[ORCHESTRATOR] Gemini CLI finished - exitCode: ${result.exitCode}, prUrl: ${prUrl ?? 'none'}`)
+    console.log(
+      `[ORCHESTRATOR] Gemini CLI finished - exitCode: ${result.exitCode}, prUrl: ${prUrl ?? 'none'}`,
+    )
 
     if (result.exitCode === 0) {
       console.log(`[ORCHESTRATOR] Task completed successfully`)
       await completeTask(projectId, task.id, { success: true, prUrl })
     } else {
-      console.log(`[ORCHESTRATOR] Task failed - stderr: ${result.stderr?.slice(0, 200)}`)
+      console.log(
+        `[ORCHESTRATOR] Task failed - stderr: ${result.stderr?.slice(0, 200)}`,
+      )
       await completeTask(projectId, task.id, {
         success: false,
         error: result.stderr || 'Command exited with non-zero status',
@@ -388,14 +405,14 @@ async function runTaskExecution(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error(`[ORCHESTRATOR] Task execution error: ${message}`)
-    
+
     // Persist any collected events even on error
     if (collectedEvents.length > 0) {
       await persistTaskLogs(task.id, collectedEvents, 0).catch(() => {
         // Ignore persistence errors during error handling
       })
     }
-    
+
     await completeTask(projectId, task.id, {
       success: false,
       error: message,
@@ -416,13 +433,14 @@ async function persistTaskLogs(
   // Extract stats from the result event if present
   const resultEvent = events.find((e) => e.type === 'result')
   const stats = resultEvent?.type === 'result' ? resultEvent.stats : undefined
-  
+
   // Find the last assistant message for summary
   const lastMessage = [...events]
     .reverse()
     .find((e) => e.type === 'message' && e.role === 'assistant')
-  const summary = lastMessage?.type === 'message' ? lastMessage.content : undefined
-  
+  const summary =
+    lastMessage?.type === 'message' ? lastMessage.content : undefined
+
   // Count tool calls
   const toolCallsCount = events.filter((e) => e.type === 'tool_use').length
 
@@ -448,7 +466,9 @@ async function persistTaskLogs(
           updatedAt: new Date(),
         },
       })
-    console.log(`[ORCHESTRATOR] Persisted ${events.length} events for task ${taskId}`)
+    console.log(
+      `[ORCHESTRATOR] Persisted ${events.length} events for task ${taskId}`,
+    )
   } catch (error) {
     console.error(`[ORCHESTRATOR] Failed to persist task logs: ${error}`)
   }

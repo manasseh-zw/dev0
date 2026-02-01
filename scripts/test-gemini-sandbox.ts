@@ -21,7 +21,7 @@ if (!existsSync(envPath)) {
 config({ path: envPath })
 
 const TEMPLATE_NAME = process.env.E2B_TEMPLATE ?? 'dev0-universal'
-const WORKSPACE_DIR = '/workspace/project'
+const WORKSPACE_DIR = '$HOME/project'
 const HOME_DIR = '$HOME'
 
 const E2B_API_KEY = process.env.E2B_API_KEY
@@ -53,6 +53,23 @@ function escapeForDoubleQuotes(value: string): string {
     .replace(/"/g, '\\"')
     .replace(/\$/g, '\\$')
     .replace(/`/g, '\\`')
+}
+
+function escapeForSingleQuotes(value: string): string {
+  return value.replace(/'/g, `'"'"'`)
+}
+
+function withBunGlobalPath(command: string): string {
+  const bunBin = '$HOME/.bun/bin:/root/.bun/bin:/home/user/.bun/bin'
+  return `PATH="${bunBin}:$PATH" ${command}`
+}
+
+function buildGeminiCommand(args: string[]): string {
+  const safeArgs = args.filter(Boolean).join(' ')
+  const gemini = `gemini ${safeArgs}`
+  const bunx = `bunx @google/gemini-cli ${safeArgs}`
+  const script = `if command -v gemini >/dev/null 2>&1; then ${gemini}; else ${bunx}; fi`
+  return `bash -lc '${escapeForSingleQuotes(script)}'`
 }
 
 async function runCommand(
@@ -147,8 +164,7 @@ Please:
 - Push the branch and open a PR using "gh pr create".
 - Include the PR URL in the final output.`
 
-    const geminiCmd = [
-      'gemini',
+    const geminiArgs = [
       '--yolo',
       `--model ${GEMINI_MODEL}`,
       GEMINI_DEBUG ? '--debug' : '',
@@ -156,10 +172,10 @@ Please:
       GEMINI_OUTPUT === 'stream-json' ? '--output-format stream-json' : '',
       `-p "${escapeForDoubleQuotes(prompt)}"`,
     ]
-      .filter(Boolean)
-      .join(' ')
 
-    const result = await runCommand(sandbox, geminiCmd, {
+    const geminiCmd = buildGeminiCommand(geminiArgs)
+
+    const result = await runCommand(sandbox, withBunGlobalPath(geminiCmd), {
       cwd: WORKSPACE_DIR,
       timeoutMs: 900000,
     })

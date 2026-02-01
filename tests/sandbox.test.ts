@@ -13,6 +13,7 @@ import { randomUUID } from 'crypto'
 
 const TEST_PROJECT_ID = randomUUID()
 const TEST_TECH_STACK: TechStack = 'tanstack-start'
+const WORKSPACE_DIR = '$HOME/project'
 
 let sandboxId: string | null = null
 
@@ -72,11 +73,7 @@ describe('Sandbox Integration Test (Live)', () => {
 
     if (!sandboxId) throw new Error('No sandbox ID from previous test')
 
-    const result = await executeCommand(
-      sandboxId,
-      'ls -la /workspace/project',
-      { cwd: '/workspace' },
-    )
+    const result = await executeCommand(sandboxId, `ls -la ${WORKSPACE_DIR}`)
 
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('package.json')
@@ -130,7 +127,7 @@ describe('Sandbox Integration Test (Live)', () => {
         'Create a file called HELLO.md with a simple greeting message that says "Hello from dev0 test!"',
       model: 'gemini-2.5-flash',
       yolo: true,
-      cwd: '/workspace/project',
+      cwd: WORKSPACE_DIR,
       onOutput: (data) => {
         logs.push(data)
         console.log(`   📡 ${data}`)
@@ -144,7 +141,7 @@ describe('Sandbox Integration Test (Live)', () => {
 
     const fileCheck = await executeCommand(
       sandboxId,
-      'cat /workspace/project/HELLO.md',
+      `cat ${WORKSPACE_DIR}/HELLO.md`,
     )
 
     expect(fileCheck.exitCode).toBe(0)
@@ -176,7 +173,7 @@ The component should:
 Keep it simple and minimal. Do not install any packages.`,
       model: 'gemini-2.5-flash',
       yolo: true,
-      cwd: '/workspace/project',
+      cwd: WORKSPACE_DIR,
       onOutput: (data) => {
         logs.push(data)
         const preview =
@@ -193,7 +190,7 @@ Keep it simple and minimal. Do not install any packages.`,
     const fileCheck = await executeCommand(
       sandboxId,
       'cat src/components/todo-list.tsx',
-      { cwd: '/workspace/project' },
+      { cwd: WORKSPACE_DIR },
     )
 
     expect(fileCheck.exitCode).toBe(0)

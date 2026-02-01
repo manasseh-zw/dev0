@@ -21,8 +21,7 @@ import { and, eq } from 'drizzle-orm'
 
 const DEFAULT_TEMPLATE = env.E2B_TEMPLATE
 const SANDBOX_HOME = '$HOME'
-const SANDBOX_WORKDIR = '/workspace'
-const PROJECT_DIR = `${SANDBOX_WORKDIR}/project`
+const PROJECT_DIR = `${SANDBOX_HOME}/project`
 
 function escapeForDoubleQuotes(value: string): string {
   return value
@@ -50,6 +49,44 @@ function buildProjectCloneUrl(project: {
   }
 
   return null
+}
+
+function withGithubToken(url: string, token?: string): string {
+  if (!token) return url
+
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return url
+  }
+
+  if (parsed.hostname !== 'github.com') return url
+  if (parsed.username || parsed.password) return url
+
+  parsed.username = 'x-access-token'
+  parsed.password = token
+
+  return parsed.toString()
+}
+
+function redactSecret(value: string, secret?: string): string {
+  if (!secret) return value
+  if (!value) return value
+  return value.split(secret).join('***')
+}
+
+function withBunGlobalPath(command: string): string {
+  const bunBin = '$HOME/.bun/bin:/root/.bun/bin:/home/user/.bun/bin'
+  return `PATH="${bunBin}:$PATH" ${command}`
+}
+
+function buildGeminiCommand(args: string[]): string {
+  const safeArgs = args.filter(Boolean).join(' ')
+  const gemini = `gemini ${safeArgs}`
+  const bunx = `bunx @google/gemini-cli ${safeArgs}`
+  const script = `if command -v gemini >/dev/null 2>&1; then ${gemini}; else ${bunx}; fi`
+  return `bash -lc '${escapeForSingleQuotes(script)}'`
 }
 
 function toCommandResult(
@@ -137,20 +174,34 @@ export const e2bProvider: SandboxProvider = {
       )}' > "${SANDBOX_HOME}/.gemini/.env"`,
     )
 
-    const cloneSource = projectCloneUrl ?? template.repoUrl
-    const cloneResult = await sandbox.commands.run(
-      `git clone '${escapeForSingleQuotes(cloneSource)}' project`,
-      {
-        cwd: SANDBOX_WORKDIR,
-        envs: {
-          GIT_TERMINAL_PROMPT: '0',
-        },
-      },
+    const cloneSource = withGithubToken(
+      projectCloneUrl ?? template.repoUrl,
+      env.GITHUB_TOKEN,
     )
+
+    let cloneResult: { exitCode: number; stdout: string; stderr: string }
+    try {
+      cloneResult = await sandbox.commands.run(
+        `git clone '${escapeForSingleQuotes(cloneSource)}' "${PROJECT_DIR}"`,
+        {
+          envs: {
+            GIT_TERMINAL_PROMPT: '0',
+          },
+        },
+      )
+    } catch (error) {
+      if (error instanceof CommandExitError) {
+        await sandbox.kill().catch(() => undefined)
+        const stderr = redactSecret(error.stderr, env.GITHUB_TOKEN)
+        throw new Error(`Failed to clone template: ${stderr}`)
+      }
+      throw error
+    }
 
     if (cloneResult.exitCode !== 0) {
       await sandbox.kill().catch(() => undefined)
-      throw new Error(`Failed to clone template: ${cloneResult.stderr}`)
+      const stderr = redactSecret(cloneResult.stderr, env.GITHUB_TOKEN)
+      throw new Error(`Failed to clone template: ${stderr}`)
     }
 
     await sandbox.commands.run(
@@ -194,10 +245,7 @@ export const e2bProvider: SandboxProvider = {
       .select()
       .from(sandboxes)
       .where(
-        and(
-          eq(sandboxes.projectId, projectId),
-          eq(sandboxes.status, 'READY'),
-        ),
+        and(eq(sandboxes.projectId, projectId), eq(sandboxes.status, 'READY')),
       )
       .limit(1)
 
@@ -244,7 +292,9 @@ export const e2bProvider: SandboxProvider = {
   ): Promise<CommandResult> {
     const dbSandbox = await getSandboxRecord(sandboxId)
     const sandbox = await connectSandbox(dbSandbox.sandboxId)
-    const fullCommand = options?.cwd ? `cd ${options.cwd} && ${command}` : command
+    const fullCommand = options?.cwd
+      ? `cd ${options.cwd} && ${command}`
+      : command
 
     const startTime = Date.now()
 
@@ -299,7 +349,9 @@ export const e2bProvider: SandboxProvider = {
     const sandbox = await connectSandbox(dbSandbox.sandboxId)
     console.log(`[SANDBOX] Got sandbox, preparing command...`)
 
-    const fullCommand = options?.cwd ? `cd ${options.cwd} && ${command}` : command
+    const fullCommand = options?.cwd
+      ? `cd ${options.cwd} && ${command}`
+      : command
     const startTime = Date.now()
 
     let stdout = ''
@@ -355,17 +407,23 @@ export const e2bProvider: SandboxProvider = {
       onOutput,
     } = options
 
-    const geminiCmd = [
-      `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
-      'gemini',
+    const geminiArgs = [
       yolo ? '--yolo' : '',
       `--model ${model}`,
       `-p "${escapeForDoubleQuotes(prompt)}"`,
     ]
+
+    const geminiCmd = [
+      `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
+      buildGeminiCommand(geminiArgs),
+    ]
       .filter(Boolean)
       .join(' ')
 
-    return this.executeCommand(sandboxId, geminiCmd, { cwd, onOutput })
+    return this.executeCommand(sandboxId, withBunGlobalPath(geminiCmd), {
+      cwd,
+      onOutput,
+    })
   },
 
   async executeGeminiStreaming(
@@ -385,26 +443,33 @@ export const e2bProvider: SandboxProvider = {
       `[SANDBOX] executeGeminiStreaming - model: ${model}, cwd: ${cwd ?? 'default'}, prompt length: ${prompt.length}`,
     )
 
-    const geminiCmd = [
-      `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
-      'unset GOOGLE_CLOUD_PROJECT &&',
-      'unset GOOGLE_CLOUD_PROJECT_ID &&',
-      'gemini',
+    const geminiArgs = [
       yolo ? '--yolo' : '',
       `--model ${model}`,
       '--output-format stream-json',
       `-p "${escapeForDoubleQuotes(prompt)}"`,
     ]
+
+    const geminiCmd = [
+      `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
+      'unset GOOGLE_CLOUD_PROJECT &&',
+      'unset GOOGLE_CLOUD_PROJECT_ID &&',
+      buildGeminiCommand(geminiArgs),
+    ]
       .filter(Boolean)
       .join(' ')
 
-    return this.executeCommandStreaming(sandboxId, geminiCmd, {
-      cwd,
-      onOutput,
-      onStdout: callbacks?.onStdout,
-      onStderr: callbacks?.onStderr,
-      onComplete: callbacks?.onComplete,
-    })
+    return this.executeCommandStreaming(
+      sandboxId,
+      withBunGlobalPath(geminiCmd),
+      {
+        cwd,
+        onOutput,
+        onStdout: callbacks?.onStdout,
+        onStderr: callbacks?.onStderr,
+        onComplete: callbacks?.onComplete,
+      },
+    )
   },
 
   async stopSandbox(sandboxId: string): Promise<void> {
