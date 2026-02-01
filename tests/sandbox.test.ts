@@ -208,43 +208,8 @@ Keep it simple and minimal. Do not install any packages.`,
     )
   }, 180_000)
 
-  test('7. Execute Gemini CLI - Context7 MCP lookup', async () => {
-    console.log('\n📚 Test 7: Running Gemini CLI (Context7 MCP)...')
-    console.log('   📝 Task: Summarize Zod using Context7 MCP')
-
-    if (!sandboxId) throw new Error('No sandbox ID from previous test')
-
-    const result = await executeGemini(sandboxId, {
-      prompt:
-        'Use the Context7 MCP server to fetch a short summary of what the Zod library is. Write the summary to CONTEXT7_ZOD.md and include a line that says "Source: Context7". If you cannot access Context7, write "CONTEXT7_UNAVAILABLE" instead.',
-      model: 'gemini-2.5-flash',
-      yolo: true,
-      cwd: '/home/daytona/workspace/project',
-    })
-
-    expect(result.exitCode).toBe(0)
-    expect(result.stdout).not.toContain(
-      "Error during discovery for MCP server 'context7'",
-    )
-
-    const fileCheck = await executeCommand(
-      sandboxId,
-      'cat /home/daytona/workspace/project/CONTEXT7_ZOD.md',
-    )
-
-    expect(fileCheck.exitCode).toBe(0)
-    expect(fileCheck.stdout).not.toContain('CONTEXT7_UNAVAILABLE')
-    expect(fileCheck.stdout.toLowerCase()).toContain('zod')
-    expect(fileCheck.stdout).toContain('Source: Context7')
-
-    console.log(`   ✅ Context7 summary created`)
-    console.log(
-      `   📄 Content preview: ${fileCheck.stdout.substring(0, 140)}...`,
-    )
-  }, 120_000)
-
-  test('8. Verify git is configured', async () => {
-    console.log('\n🔧 Test 8: Checking git configuration...')
+  test('7. Verify git is configured', async () => {
+    console.log('\n🔧 Test 7: Checking git configuration...')
 
     if (!sandboxId) throw new Error('No sandbox ID from previous test')
 

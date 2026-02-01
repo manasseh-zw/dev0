@@ -43,10 +43,6 @@ export const env = {
   // This is separate from our backend key - used for autonomous coding in sandboxes
   AGENT_GEMINI_API_KEY: requireEnv('AGENT_GEMINI_API_KEY'),
 
-  // Context7 MCP API Key (for documentation lookup in sandboxes)
-  // Enables Gemini CLI to fetch live documentation for any library
-  CONTEXT7_API_KEY: requireEnv('CONTEXT7_API_KEY'),
-
   // GitHub
   GITHUB_TOKEN: requireEnv('GITHUB_TOKEN'),
   GITHUB_BOT_USERNAME: optionalEnv('GITHUB_BOT_USERNAME', 'dev0-agent'),

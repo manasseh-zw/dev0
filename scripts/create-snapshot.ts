@@ -9,7 +9,6 @@
  * - Git
  * - GitHub CLI (gh)
  * - Gemini CLI (@google/gemini-cli) with:
- *   - Pre-configured Context7 MCP for documentation lookup
  *   - API key authentication for headless/YOLO mode
  *
  * Usage:
@@ -19,7 +18,6 @@
  *   - DAYTONA_API_KEY in .env.local
  *   - DAYTONA_API_URL in .env.local
  *   - AGENT_GEMINI_API_KEY in .env.local (for sandbox Gemini auth)
- *   - CONTEXT7_API_KEY in .env.local (for MCP documentation lookup)
  */
 
 import { Daytona, Image } from '@daytonaio/sdk'
@@ -33,16 +31,12 @@ const WORKING_DIR = '/home/daytona/workspace'
 
 // Get required environment variables
 const AGENT_GEMINI_API_KEY = process.env.AGENT_GEMINI_API_KEY
-const CONTEXT7_API_KEY = process.env.CONTEXT7_API_KEY
 
 function validateEnv() {
   const missing: string[] = []
 
   if (!AGENT_GEMINI_API_KEY) {
     missing.push('AGENT_GEMINI_API_KEY')
-  }
-  if (!CONTEXT7_API_KEY) {
-    missing.push('CONTEXT7_API_KEY')
   }
 
   if (missing.length > 0) {
@@ -55,20 +49,10 @@ function validateEnv() {
 
 /**
  * Generate the Gemini CLI settings.json content
- * Creates a complete settings JSON with Context7 MCP configured
  */
 function generateGeminiSettings(): string {
   const settings = {
     selectedAuthType: 'gemini-api-key', // Critical for headless/non-interactive use
-    mcpServers: {
-      context7: {
-        url: 'https://mcp.context7.com/mcp', // standard field is 'url'
-        headers: {
-          'x-api-key': CONTEXT7_API_KEY, // verify exact header with context7 docs
-          Accept: 'application/json',
-        },
-      },
-    },
   }
   return JSON.stringify(settings)
 }
@@ -92,7 +76,6 @@ async function createSnapshot() {
   console.log('  - jq (JSON processor)')
   console.log('')
   console.log('Gemini CLI Configuration:')
-  console.log('  - Context7 MCP for documentation lookup')
   console.log('  - API key authentication for headless/YOLO mode')
   console.log('')
 
@@ -102,7 +85,6 @@ async function createSnapshot() {
   const universalImage = Image.base('oven/bun:1.3')
     .env({
       GEMINI_API_KEY: AGENT_GEMINI_API_KEY!,
-      CONTEXT7_API_KEY: CONTEXT7_API_KEY!,
     })
     .runCommands(
       // Add 'ripgrep' here to prevent the CLI from trying to download it later
@@ -157,11 +139,8 @@ async function createSnapshot() {
     console.log('  - gemini (Google Gemini CLI - for AI coding)')
     console.log('  - jq (JSON processor)')
     console.log('\nGemini CLI Configuration:')
-    console.log('  - ~/.gemini/settings.json (Context7 MCP configured)')
+    console.log('  - ~/.gemini/settings.json (headless auth configured)')
     console.log('  - ~/.gemini/.env (API key for headless mode)')
-    console.log('\nContext7 MCP Configuration:')
-    console.log('  - Uses HTTP URL: https://mcp.context7.com/mcp')
-    console.log('  - API key injected via headers')
     console.log('\nYOLO Mode Usage:')
     console.log(
       '  gemini --yolo --model gemini-3-pro-preview -p "your prompt here"',

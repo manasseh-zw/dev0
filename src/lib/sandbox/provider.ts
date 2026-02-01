@@ -67,15 +67,7 @@ export async function createSandbox(
   }
 
   const geminiSettings = JSON.stringify({
-    mcpServers: {
-      context7: {
-        httpUrl: 'https://mcp.context7.com/mcp',
-        headers: {
-          CONTEXT7_API_KEY: env.CONTEXT7_API_KEY,
-          Accept: 'application/json',
-        },
-      },
-    },
+    selectedAuthType: 'gemini-api-key',
   })
   const geminiEnvContent = `GEMINI_API_KEY="${env.AGENT_GEMINI_API_KEY}"`
   await sandbox.process.executeCommand(
@@ -354,6 +346,7 @@ export async function executeGeminiStreaming(
   )
 
   const geminiCmd = [
+    `GEMINI_API_KEY='${escapeForSingleQuotes(env.AGENT_GEMINI_API_KEY)}'`,
     'unset GOOGLE_CLOUD_PROJECT &&',
     'unset GOOGLE_CLOUD_PROJECT_ID &&',
     'gemini',
