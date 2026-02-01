@@ -20,7 +20,7 @@ import { CommandExitError, Sandbox } from 'e2b'
 import { and, eq } from 'drizzle-orm'
 
 const DEFAULT_TEMPLATE = env.E2B_TEMPLATE
-const SANDBOX_HOME = '/root'
+const SANDBOX_HOME = '$HOME'
 const SANDBOX_WORKDIR = '/workspace'
 const PROJECT_DIR = `${SANDBOX_WORKDIR}/project`
 
@@ -130,11 +130,11 @@ export const e2bProvider: SandboxProvider = {
     const geminiEnvContent = `GEMINI_API_KEY="${env.AGENT_GEMINI_API_KEY}"`
 
     await sandbox.commands.run(
-      `mkdir -p ${SANDBOX_HOME}/.gemini && echo '${escapeForSingleQuotes(
+      `mkdir -p "${SANDBOX_HOME}/.gemini" && printf '%s' '${escapeForSingleQuotes(
         geminiSettings,
-      )}' > ${SANDBOX_HOME}/.gemini/settings.json && echo '${escapeForSingleQuotes(
+      )}' > "${SANDBOX_HOME}/.gemini/settings.json" && printf '%s' '${escapeForSingleQuotes(
         geminiEnvContent,
-      )}' > ${SANDBOX_HOME}/.gemini/.env`,
+      )}' > "${SANDBOX_HOME}/.gemini/.env"`,
     )
 
     const cloneSource = projectCloneUrl ?? template.repoUrl

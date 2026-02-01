@@ -22,7 +22,7 @@ config({ path: envPath })
 
 const TEMPLATE_NAME = process.env.E2B_TEMPLATE ?? 'dev0-universal'
 const WORKSPACE_DIR = '/workspace/project'
-const HOME_DIR = '/root'
+const HOME_DIR = '$HOME'
 
 const E2B_API_KEY = process.env.E2B_API_KEY
 const AGENT_GEMINI_API_KEY = process.env.AGENT_GEMINI_API_KEY
@@ -121,7 +121,7 @@ async function main() {
   try {
     await runCommand(
       sandbox,
-      `mkdir -p ${HOME_DIR}/.gemini && echo '{"selectedAuthType":"gemini-api-key"}' > ${HOME_DIR}/.gemini/settings.json && echo 'GEMINI_API_KEY="${AGENT_GEMINI_API_KEY}"' > ${HOME_DIR}/.gemini/.env`,
+      `mkdir -p "${HOME_DIR}/.gemini" && printf '%s' '{"selectedAuthType":"gemini-api-key"}' > "${HOME_DIR}/.gemini/settings.json" && printf '%s' 'GEMINI_API_KEY="${AGENT_GEMINI_API_KEY}"' > "${HOME_DIR}/.gemini/.env`,
     )
 
     await runCommand(
