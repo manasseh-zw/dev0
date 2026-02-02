@@ -76,17 +76,9 @@ function redactSecret(value: string, secret?: string): string {
   return value.split(secret).join('***')
 }
 
-function withBunGlobalPath(command: string): string {
-  const bunBin = '$HOME/.bun/bin:/root/.bun/bin:/home/user/.bun/bin'
-  return `PATH="${bunBin}:$PATH" ${command}`
-}
-
 function buildGeminiCommand(args: string[]): string {
   const safeArgs = args.filter(Boolean).join(' ')
-  const gemini = `gemini ${safeArgs}`
-  const bunx = `bunx @google/gemini-cli ${safeArgs}`
-  const script = `if command -v gemini >/dev/null 2>&1; then ${gemini}; else ${bunx}; fi`
-  return `bash -lc '${escapeForSingleQuotes(script)}'`
+  return `gemini ${safeArgs}`
 }
 
 function toCommandResult(
@@ -420,7 +412,7 @@ export const e2bProvider: SandboxProvider = {
       .filter(Boolean)
       .join(' ')
 
-    return this.executeCommand(sandboxId, withBunGlobalPath(geminiCmd), {
+    return this.executeCommand(sandboxId, geminiCmd, {
       cwd,
       onOutput,
     })
@@ -459,17 +451,13 @@ export const e2bProvider: SandboxProvider = {
       .filter(Boolean)
       .join(' ')
 
-    return this.executeCommandStreaming(
-      sandboxId,
-      withBunGlobalPath(geminiCmd),
-      {
-        cwd,
-        onOutput,
-        onStdout: callbacks?.onStdout,
-        onStderr: callbacks?.onStderr,
-        onComplete: callbacks?.onComplete,
-      },
-    )
+    return this.executeCommandStreaming(sandboxId, geminiCmd, {
+      cwd,
+      onOutput,
+      onStdout: callbacks?.onStdout,
+      onStderr: callbacks?.onStderr,
+      onComplete: callbacks?.onComplete,
+    })
   },
 
   async stopSandbox(sandboxId: string): Promise<void> {

@@ -59,28 +59,26 @@ function escapeForSingleQuotes(value: string): string {
   return value.replace(/'/g, `'"'"'`)
 }
 
-function withBunGlobalPath(command: string): string {
-  const bunBin = '$HOME/.bun/bin:/root/.bun/bin:/home/user/.bun/bin'
-  return `PATH="${bunBin}:$PATH" ${command}`
-}
-
 function buildGeminiCommand(args: string[]): string {
   const safeArgs = args.filter(Boolean).join(' ')
-  const gemini = `gemini ${safeArgs}`
-  const bunx = `bunx @google/gemini-cli ${safeArgs}`
-  const script = `if command -v gemini >/dev/null 2>&1; then ${gemini}; else ${bunx}; fi`
-  return `bash -lc '${escapeForSingleQuotes(script)}'`
+  return `gemini ${safeArgs}`
+}
+
+function wrapBash(command: string): string {
+  return `bash -lc '${escapeForSingleQuotes(command)}'`
 }
 
 async function runCommand(
   sandbox: Sandbox,
   command: string,
-  options?: { cwd?: string; timeoutMs?: number },
+  options?: { cwd?: string; timeoutMs?: number; wrapBash?: boolean },
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const fullCommand = options?.cwd ? `cd ${options.cwd} && ${command}` : command
+  const wrapped =
+    options?.wrapBash === false ? fullCommand : wrapBash(fullCommand)
 
   try {
-    const result = await sandbox.commands.run(fullCommand, {
+    const result = await sandbox.commands.run(wrapped, {
       timeoutMs: options?.timeoutMs ?? 600000,
       onStdout: (chunk) => {
         process.stdout.write(chunk)
@@ -136,21 +134,37 @@ async function main() {
   })
 
   try {
-    await runCommand(
+    const settingsResult = await runCommand(
       sandbox,
-      `mkdir -p "${HOME_DIR}/.gemini" && printf '%s' '{"selectedAuthType":"gemini-api-key"}' > "${HOME_DIR}/.gemini/settings.json" && printf '%s' 'GEMINI_API_KEY="${AGENT_GEMINI_API_KEY}"' > "${HOME_DIR}/.gemini/.env`,
+      [
+        `mkdir -p "${HOME_DIR}/.gemini"`,
+        `printf '%s' '{"selectedAuthType":"gemini-api-key"}' > "${HOME_DIR}/.gemini/settings.json"`,
+        `printf '%s' "GEMINI_API_KEY=${escapeForDoubleQuotes(AGENT_GEMINI_API_KEY!)}" > "${HOME_DIR}/.gemini/.env"`,
+      ].join(' && '),
+      { wrapBash: false },
     )
+    if (settingsResult.exitCode !== 0) {
+      throw new Error(
+        `Failed to write Gemini settings (exit ${settingsResult.exitCode})`,
+      )
+    }
 
-    await runCommand(
+    const cloneResult = await runCommand(
       sandbox,
-      `GIT_TERMINAL_PROMPT=0 git clone "${REPO_URL}" ${WORKSPACE_DIR} && cd ${WORKSPACE_DIR}`,
+      `GIT_TERMINAL_PROMPT=0 git clone "${REPO_URL}" "${WORKSPACE_DIR}"`,
     )
+    if (cloneResult.exitCode !== 0) {
+      throw new Error(`Git clone failed (exit ${cloneResult.exitCode})`)
+    }
 
-    await runCommand(
+    const gitConfigResult = await runCommand(
       sandbox,
       `git config user.email "dev0-agent@users.noreply.github.com" && git config user.name "dev0-agent"`,
       { cwd: WORKSPACE_DIR },
     )
+    if (gitConfigResult.exitCode !== 0) {
+      throw new Error(`Git config failed (exit ${gitConfigResult.exitCode})`)
+    }
 
     const prompt = `${FEATURE_PROMPT}
 
@@ -175,9 +189,10 @@ Please:
 
     const geminiCmd = buildGeminiCommand(geminiArgs)
 
-    const result = await runCommand(sandbox, withBunGlobalPath(geminiCmd), {
+    const result = await runCommand(sandbox, geminiCmd, {
       cwd: WORKSPACE_DIR,
       timeoutMs: 900000,
+      wrapBash: false,
     })
 
     if (result.exitCode !== 0) {

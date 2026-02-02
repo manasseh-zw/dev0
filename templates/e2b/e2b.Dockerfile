@@ -1,4 +1,4 @@
-FROM oven/bun:1.3
+FROM node:lts
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/root
@@ -24,7 +24,9 @@ RUN mkdir -p /etc/apt/keyrings \
   && apt-get install -y gh \
   && rm -rf /var/lib/apt/lists/*
 
-RUN bun install -g @google/gemini-cli
+RUN npm install -g @google/gemini-cli
+
+ENV PATH=/usr/local/bin:$PATH
 
 RUN mkdir -p $HOME/.gemini \
   && echo '{"selectedAuthType":"gemini-api-key"}' > $HOME/.gemini/settings.json
