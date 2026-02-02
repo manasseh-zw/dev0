@@ -434,10 +434,14 @@ async function persistTaskLogs(
   const resultEvent = events.find((e) => e.type === 'result')
   const stats = resultEvent?.type === 'result' ? resultEvent.stats : undefined
 
-  // Find the last assistant message for summary
-  const lastMessage = [...events]
+  // Find the last assistant message for summary, prefer non-delta content
+  const assistantMessages = events.filter(
+    (event) => event.type === 'message' && event.role === 'assistant',
+  )
+  const lastFullMessage = [...assistantMessages]
     .reverse()
-    .find((e) => e.type === 'message' && e.role === 'assistant')
+    .find((event) => event.type === 'message' && !event.delta)
+  const lastMessage = lastFullMessage ?? assistantMessages.at(-1)
   const summary =
     lastMessage?.type === 'message' ? lastMessage.content : undefined
 
@@ -521,8 +525,10 @@ Requirements:
 - Follow any guidance in .dev0/RULES.md if present.
 - Update TASKLIST.md and LEARNINGS.md if they exist.
 - Keep changes scoped to the task and run relevant checks if needed.
+- Use bun for installs and scripts (bun install, bun run, etc.).
+- Do NOT run git commit, git push, or gh pr create.
 
-Finish by summarizing what you changed and include any PR URL if you created one.`
+Finish by summarizing what you changed.`
 }
 
 function extractPrUrl(text: string): string | undefined {

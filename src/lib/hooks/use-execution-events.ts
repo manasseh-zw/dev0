@@ -22,8 +22,12 @@ type UseExecutionEventsOptions = {
 
 type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'error' | 'closed'
 
-const defaultOptions: Required<Pick<UseExecutionEventsOptions, 'enabled'>> = {
+const defaultOptions: Required<
+  Pick<UseExecutionEventsOptions, 'enabled' | 'maxLogs' | 'maxEvents'>
+> = {
   enabled: true,
+  maxLogs: 500,
+  maxEvents: 200,
 }
 
 function createLogEntry(
@@ -51,6 +55,10 @@ export function useExecutionEvents(
   const [logs, setLogs] = React.useState<ExecutionLogEntry[]>([])
   const [status, setStatus] = React.useState<ConnectionStatus>('idle')
   const eventSourceRef = React.useRef<EventSource | null>(null)
+  const reconnectRef = React.useRef<{
+    attempts: number
+    timeoutId: ReturnType<typeof setTimeout> | null
+  }>({ attempts: 0, timeoutId: null })
   const onEventRef = React.useRef<UseExecutionEventsOptions['onEvent']>(onEvent)
   const onLogRef = React.useRef<UseExecutionEventsOptions['onLog']>(onLog)
   const onErrorRef = React.useRef<UseExecutionEventsOptions['onError']>(onError)
@@ -66,50 +74,84 @@ export function useExecutionEvents(
       return
     }
 
-    const eventSource = new EventSource(`/api/events/${projectId}`)
-    eventSourceRef.current = eventSource
-    setStatus('connecting')
+    let isActive = true
 
-    eventSource.onopen = () => {
-      setStatus('open')
-    }
-
-    eventSource.onmessage = (message) => {
-      try {
-        const event = JSON.parse(message.data) as ExecutionEvent
-        setEvents((current) => {
-          const next = [...current, event]
-          if (maxEvents && next.length > maxEvents) {
-            return next.slice(next.length - maxEvents)
-          }
-          return next
-        })
-        onEventRef.current?.(event)
-
-        if (event.type === 'task_log') {
-          const entry = createLogEntry(event)
-          setLogs((current) => {
-            const next = [...current, entry]
-            if (maxLogs && next.length > maxLogs) {
-              return next.slice(next.length - maxLogs)
-            }
-            return next
-          })
-          onLogRef.current?.(entry)
-        }
-      } catch (error) {
-        onErrorRef.current?.(error)
+    const clearReconnect = () => {
+      if (reconnectRef.current.timeoutId) {
+        clearTimeout(reconnectRef.current.timeoutId)
+        reconnectRef.current.timeoutId = null
       }
     }
 
-    eventSource.onerror = (error) => {
-      setStatus('error')
-      onErrorRef.current?.(error)
-      eventSource.close()
+    const scheduleReconnect = () => {
+      if (!enabled || !projectId) return
+      if (reconnectRef.current.timeoutId) return
+      const attempt = reconnectRef.current.attempts
+      const delay = Math.min(1000 * 2 ** attempt, 15000)
+      reconnectRef.current.attempts += 1
+      reconnectRef.current.timeoutId = setTimeout(() => {
+        reconnectRef.current.timeoutId = null
+        if (isActive) {
+          connect()
+        }
+      }, delay)
     }
 
+    const connect = () => {
+      if (!enabled || !projectId || !isActive) return
+      eventSourceRef.current?.close()
+      const eventSource = new EventSource(`/api/events/${projectId}`)
+      eventSourceRef.current = eventSource
+      setStatus('connecting')
+
+      eventSource.onopen = () => {
+        reconnectRef.current.attempts = 0
+        clearReconnect()
+        setStatus('open')
+      }
+
+      eventSource.onmessage = (message) => {
+        try {
+          const event = JSON.parse(message.data) as ExecutionEvent
+          setEvents((current) => {
+            const next = [...current, event]
+            if (maxEvents && next.length > maxEvents) {
+              return next.slice(next.length - maxEvents)
+            }
+            return next
+          })
+          onEventRef.current?.(event)
+
+          if (event.type === 'task_log') {
+            const entry = createLogEntry(event)
+            setLogs((current) => {
+              const next = [...current, entry]
+              if (maxLogs && next.length > maxLogs) {
+                return next.slice(next.length - maxLogs)
+              }
+              return next
+            })
+            onLogRef.current?.(entry)
+          }
+        } catch (error) {
+          onErrorRef.current?.(error)
+        }
+      }
+
+      eventSource.onerror = (error) => {
+        setStatus('error')
+        onErrorRef.current?.(error)
+        eventSource.close()
+        scheduleReconnect()
+      }
+    }
+
+    connect()
+
     return () => {
-      eventSource.close()
+      isActive = false
+      clearReconnect()
+      eventSourceRef.current?.close()
       eventSourceRef.current = null
       setStatus('closed')
     }

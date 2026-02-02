@@ -26,6 +26,8 @@ RUN mkdir -p /etc/apt/keyrings \
 
 RUN npm install -g @google/gemini-cli
 
+RUN npm install -g bun
+
 ENV PATH=/usr/local/bin:$PATH
 
 RUN mkdir -p $HOME/.gemini \

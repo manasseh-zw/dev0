@@ -196,6 +196,18 @@ export const e2bProvider: SandboxProvider = {
       throw new Error(`Failed to clone template: ${stderr}`)
     }
 
+    if (env.GITHUB_TOKEN) {
+      const remoteUrl = withGithubToken(
+        projectCloneUrl ?? template.repoUrl,
+        env.GITHUB_TOKEN,
+      )
+      await sandbox.commands.run(
+        `git -C "${PROJECT_DIR}" remote set-url origin '${escapeForSingleQuotes(
+          remoteUrl,
+        )}'`,
+      )
+    }
+
     await sandbox.commands.run(
       `mkdir -p ${PROJECT_DIR}/.gemini && echo '${escapeForSingleQuotes(
         geminiSettings,

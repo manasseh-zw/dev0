@@ -48,7 +48,14 @@ const modelOptions = [
   },
 ] as const
 
-export function TaskCard({ task, status, isBlocked = false, onModelChange, onStartTask, onClick }: TaskCardProps) {
+export function TaskCard({
+  task,
+  status,
+  isBlocked = false,
+  onModelChange,
+  onStartTask,
+  onClick,
+}: TaskCardProps) {
   const StatusIcon = status.icon
   const isCompleted = task.status === 'DONE'
   const isFailed = task.status === 'FAILED'
@@ -63,7 +70,7 @@ export function TaskCard({ task, status, isBlocked = false, onModelChange, onSta
     modelOptions.find((option) => option.id === modelValue) ?? modelOptions[0]
 
   return (
-    <div 
+    <div
       className="bg-background shrink-0 rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary/50 transition-colors"
       onClick={onClick}
     >
@@ -170,7 +177,10 @@ export function TaskCard({ task, status, isBlocked = false, onModelChange, onSta
               size="sm"
               className="px-2 text-[10px] gap-1"
               disabled={isBlocked}
-              onClick={() => onStartTask?.(task.id)}
+              onClick={(event) => {
+                event.stopPropagation()
+                onStartTask?.(task.id)
+              }}
             >
               <HugeiconsIcon icon={PlayIcon} className="size-3" />
               Start
