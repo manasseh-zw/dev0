@@ -1,9 +1,11 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { env } from '@/lib/env'
 import { projects, tasks, taskLogs } from '@/lib/db/schema'
 import { executionBus } from '@/lib/execution/event-bus'
 import {
   executeGeminiStreaming,
+  executeCommand,
   getOrCreateProjectSandbox,
 } from '@/lib/sandbox/provider'
 import type { Task } from '@/lib/types/task'
@@ -287,7 +289,11 @@ async function runTaskExecution(
 
   try {
     const project = await getProjectById(projectId)
-    const prompt = buildTaskPrompt(project, task)
+    const runDir = `${WORKSPACE_DIR}/.dev0/runs/${task.id}`
+    await executeCommand(sandboxId, `mkdir -p "${runDir}"`, {
+      cwd: WORKSPACE_DIR,
+    })
+    const prompt = buildTaskPrompt(project, task, runDir)
     console.log(`[ORCHESTRATOR] Built prompt, executing Gemini CLI...`)
 
     let stdoutBuffer = ''
@@ -384,14 +390,36 @@ async function runTaskExecution(
     // Persist logs to database
     await persistTaskLogs(task.id, collectedEvents, result.duration)
 
+    const agentResultPath = `${runDir}/agent-result.json`
+    const agentResult = await readAgentResult(sandboxId, agentResultPath)
+
     const prUrl = extractPrUrl(`${result.stdout}\n${result.stderr}`)
     console.log(
       `[ORCHESTRATOR] Gemini CLI finished - exitCode: ${result.exitCode}, prUrl: ${prUrl ?? 'none'}`,
     )
 
     if (result.exitCode === 0) {
+      const finalize = await finalizeTaskChanges(
+        sandboxId,
+        task,
+        project,
+        agentResult,
+      )
+
+      if (finalize.error) {
+        await completeTask(projectId, task.id, {
+          success: false,
+          error: finalize.error,
+          prUrl: finalize.prUrl ?? prUrl,
+        })
+        return
+      }
+
       console.log(`[ORCHESTRATOR] Task completed successfully`)
-      await completeTask(projectId, task.id, { success: true, prUrl })
+      await completeTask(projectId, task.id, {
+        success: true,
+        prUrl: finalize.prUrl ?? prUrl,
+      })
     } else {
       console.log(
         `[ORCHESTRATOR] Task failed - stderr: ${result.stderr?.slice(0, 200)}`,
@@ -418,6 +446,164 @@ async function runTaskExecution(
       error: message,
     })
   }
+}
+
+async function readAgentResult(
+  sandboxId: string,
+  resultPath: string,
+): Promise<{
+  status: 'success' | 'failed'
+  commitMessage?: string
+  prTitle?: string
+  prBody?: string
+  notes?: string
+} | null> {
+  const readResult = await executeCommand(sandboxId, `cat "${resultPath}"`, {
+    cwd: WORKSPACE_DIR,
+  })
+
+  if (readResult.exitCode !== 0 || !readResult.stdout.trim()) {
+    return null
+  }
+
+  try {
+    return JSON.parse(readResult.stdout)
+  } catch {
+    return null
+  }
+}
+
+async function finalizeTaskChanges(
+  sandboxId: string,
+  task: Task,
+  project: { repoUrl: string | null; repoName: string | null },
+  agentResult: {
+    status: 'success' | 'failed'
+    commitMessage?: string
+    prTitle?: string
+    prBody?: string
+  } | null,
+): Promise<{ prUrl?: string; error?: string }> {
+  if (!project.repoUrl && !project.repoName) {
+    return { error: 'Missing project repository info' }
+  }
+
+  const remoteUrl = withGithubToken(project.repoUrl, project.repoName)
+  if (!remoteUrl) {
+    return { error: 'Missing repository URL' }
+  }
+
+  const remoteResult = await executeCommand(
+    sandboxId,
+    `git remote set-url origin "${escapeShellDoubleQuotes(remoteUrl)}"`,
+    { cwd: WORKSPACE_DIR },
+  )
+  if (remoteResult.exitCode !== 0) {
+    return { error: 'Failed to set authenticated remote' }
+  }
+
+  const branchName = `dev0/task-${task.id}`
+  const commitMessage =
+    agentResult?.commitMessage?.trim() || `feat: complete task ${task.title}`
+  const prTitle = agentResult?.prTitle?.trim() || `feat: ${task.title}`
+  const prBody = agentResult?.prBody?.trim() || ''
+
+  const gitConfig = await executeCommand(
+    sandboxId,
+    'git config user.email "dev0-agent@users.noreply.github.com" && git config user.name "dev0-agent"',
+    { cwd: WORKSPACE_DIR },
+  )
+  if (gitConfig.exitCode !== 0) {
+    return { error: 'Failed to configure git user' }
+  }
+
+  const prepareBranch = await executeCommand(
+    sandboxId,
+    `git checkout -B "${branchName}"`,
+    { cwd: WORKSPACE_DIR },
+  )
+  if (prepareBranch.exitCode !== 0) {
+    return { error: 'Failed to create branch' }
+  }
+
+  const addResult = await executeCommand(sandboxId, 'git add -A', {
+    cwd: WORKSPACE_DIR,
+  })
+  if (addResult.exitCode !== 0) {
+    return { error: 'Failed to stage changes' }
+  }
+
+  const diffResult = await executeCommand(
+    sandboxId,
+    'git diff --cached --quiet',
+    { cwd: WORKSPACE_DIR },
+  )
+  if (diffResult.exitCode === 0) {
+    return { error: 'No changes to commit' }
+  }
+
+  const commitResult = await executeCommand(
+    sandboxId,
+    `git -c core.compression=0 -c http.compression=0 -c http.version=HTTP/1.1 commit -m "${escapeShellDoubleQuotes(
+      commitMessage,
+    )}"`,
+    { cwd: WORKSPACE_DIR },
+  )
+  if (commitResult.exitCode !== 0) {
+    return { error: 'Git commit failed' }
+  }
+
+  const pushResult = await executeCommand(
+    sandboxId,
+    `GIT_HTTP_VERSION=HTTP/1.1 git -c core.compression=0 -c http.compression=0 -c http.version=HTTP/1.1 push -u origin "${branchName}"`,
+    { cwd: WORKSPACE_DIR },
+  )
+  if (pushResult.exitCode !== 0) {
+    return { error: 'Git push failed' }
+  }
+
+  const prResult = await executeCommand(
+    sandboxId,
+    `GODEBUG=http2client=0 GH_PAGER=cat GIT_HTTP_VERSION=HTTP/1.1 gh pr create --title "${escapeShellDoubleQuotes(
+      prTitle,
+    )}" --body "${escapeShellDoubleQuotes(prBody)}"`,
+    { cwd: WORKSPACE_DIR },
+  )
+  if (prResult.exitCode !== 0) {
+    return { error: 'gh pr create failed' }
+  }
+
+  const prUrl = extractPrUrl(`${prResult.stdout}\n${prResult.stderr}`)
+  return { prUrl }
+}
+
+function withGithubToken(
+  repoUrl: string | null,
+  repoName: string | null,
+): string {
+  const owner = env.GITHUB_BOT_USERNAME
+  const url = repoUrl
+    ? repoUrl
+    : repoName
+      ? `https://github.com/${owner}/${repoName}.git`
+      : ''
+
+  if (!url) return ''
+
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname !== 'github.com') return url
+    if (parsed.username || parsed.password) return url
+    parsed.username = 'x-access-token'
+    parsed.password = env.GITHUB_TOKEN
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}
+
+function escapeShellDoubleQuotes(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
 /**
@@ -489,6 +675,7 @@ function buildTaskPrompt(
     specContent: string | null
   },
   task: Task,
+  runDir: string,
 ): string {
   const projectInfo = [
     `Project: ${project.name}`,
@@ -527,6 +714,8 @@ Requirements:
 - Keep changes scoped to the task and run relevant checks if needed.
 - Use bun for installs and scripts (bun install, bun run, etc.).
 - Do NOT run git commit, git push, or gh pr create.
+- Write a JSON file at ${runDir}/agent-result.json with:
+  {"status":"success|failed","commitMessage":"...","prTitle":"...","prBody":"...","notes":"..."}
 
 Finish by summarizing what you changed.`
 }
