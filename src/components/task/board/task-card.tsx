@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar'
 import 'react-circular-progressbar/dist/styles.css'
 
@@ -27,6 +28,7 @@ interface TaskCardProps {
   status: Status
   /** Pre-computed blocked status - computed at board level for performance */
   isBlocked?: boolean
+  isStarting?: boolean
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
@@ -52,6 +54,7 @@ export function TaskCard({
   task,
   status,
   isBlocked = false,
+  isStarting = false,
   onModelChange,
   onStartTask,
   onClick,
@@ -60,6 +63,7 @@ export function TaskCard({
   const isCompleted = task.status === 'DONE'
   const isFailed = task.status === 'FAILED'
   const isPending = task.status === 'PENDING'
+  const isStartDisabled = isBlocked || isStarting
   const hasPr = Boolean(task.prUrl)
   const hasAttempts = task.maxAttempts > 0
   const attemptProgress = hasAttempts
@@ -176,14 +180,23 @@ export function TaskCard({
             <Button
               size="sm"
               className="px-2 text-[10px] gap-1"
-              disabled={isBlocked}
+              disabled={isStartDisabled}
               onClick={(event) => {
                 event.stopPropagation()
                 onStartTask?.(task.id)
               }}
             >
-              <HugeiconsIcon icon={PlayIcon} className="size-3" />
-              Start
+              {isStarting ? (
+                <span className="inline-flex items-center gap-1">
+                  <Spinner className="size-3" />
+                  Starting
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <HugeiconsIcon icon={PlayIcon} className="size-3" />
+                  Start
+                </span>
+              )}
             </Button>
           )}
         </div>

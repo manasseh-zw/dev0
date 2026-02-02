@@ -1,27 +1,34 @@
-"use client";
+'use client'
 
-import { AnimatePresence, motion } from "motion/react";
-import type { TaskWithBlocked } from "@/lib/types";
-import { Status } from "@/components/task/mock-data/statuses";
-import { TaskCard } from "./task-card";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
-
+import { AnimatePresence, motion } from 'motion/react'
+import type { TaskWithBlocked } from '@/lib/types'
+import { Status } from '@/components/task/mock-data/statuses'
+import { TaskCard } from './task-card'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Add01Icon, MoreHorizontalIcon } from '@hugeicons/core-free-icons'
+import { Button } from '@/components/ui/button'
 
 interface TaskColumnProps {
-  status: Status;
-  tasks: TaskWithBlocked[];
+  status: Status
+  tasks: TaskWithBlocked[]
+  startingTaskIds?: Record<string, boolean>
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
-  ) => void;
-  onStartTask?: (taskId: string) => void;
-  onTaskClick?: (task: TaskWithBlocked) => void;
+  ) => void
+  onStartTask?: (taskId: string) => void
+  onTaskClick?: (task: TaskWithBlocked) => void
 }
 
-export function TaskColumn({ status, tasks, onModelChange, onStartTask, onTaskClick }: TaskColumnProps) {
-  const StatusIcon = status.icon;
+export function TaskColumn({
+  status,
+  tasks,
+  startingTaskIds = {},
+  onModelChange,
+  onStartTask,
+  onTaskClick,
+}: TaskColumnProps) {
+  const StatusIcon = status.icon
 
   return (
     <div className="shrink-0 w-[300px] lg:w-[360px] flex flex-col h-full flex-1">
@@ -53,7 +60,7 @@ export function TaskColumn({ status, tasks, onModelChange, onStartTask, onTaskCl
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{
-                  type: "spring",
+                  type: 'spring',
                   stiffness: 200,
                   damping: 20,
                   mass: 1,
@@ -64,6 +71,7 @@ export function TaskColumn({ status, tasks, onModelChange, onStartTask, onTaskCl
                   task={task}
                   status={status}
                   isBlocked={task.isBlocked}
+                  isStarting={Boolean(startingTaskIds[task.id])}
                   onModelChange={onModelChange}
                   onStartTask={onStartTask}
                   onClick={() => onTaskClick?.(task)}
@@ -83,6 +91,5 @@ export function TaskColumn({ status, tasks, onModelChange, onStartTask, onTaskCl
         </div>
       </div>
     </div>
-  );
+  )
 }
-

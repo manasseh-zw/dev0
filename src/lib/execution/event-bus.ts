@@ -17,7 +17,7 @@ export type ExecutionEvent =
       geminiEvent?: GeminiStreamEvent
     }
   | {
-      type: 'task_completed'
+      type: 'task_review'
       projectId: string
       taskId: string
       prUrl?: string
@@ -40,7 +40,9 @@ class ExecutionEventBus extends EventEmitter {
       const event = eventOrName
       if (event.type !== 'task_log') {
         // Log all events except logs (too noisy)
-        console.log(`[EVENT_BUS] Emitting ${event.type} for project ${event.projectId}`)
+        console.log(
+          `[EVENT_BUS] Emitting ${event.type} for project ${event.projectId}`,
+        )
       }
       return super.emit(event.projectId, event)
     }

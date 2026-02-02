@@ -1,19 +1,22 @@
 'use client'
 
-import * as React from 'react'
-import type { TaskWithLogs } from '@/lib/types/task'
+import { statuses } from '@/components/task/mock-data/statuses'
+import { TaskInfo } from '@/components/task/sheet/task-info'
+import { TaskLogs } from '@/components/task/sheet/task-logs'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import type { TaskWithLogs } from '@/lib/types/task'
+import {
+  CommandLineIcon,
+  InformationCircleIcon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { InformationCircleIcon, CommandLineIcon } from '@hugeicons/core-free-icons'
-import { TaskInfo } from '@/components/task/sheet/task-info'
-import { TaskLogs } from '@/components/task/sheet/task-logs'
-import { statuses } from '@/components/task/mock-data/statuses'
+import * as React from 'react'
 
 interface TaskSheetProps {
   task: TaskWithLogs | null
@@ -22,7 +25,12 @@ interface TaskSheetProps {
   projectId?: string
 }
 
-export function TaskSheet({ task, open, onOpenChange, projectId }: TaskSheetProps) {
+export function TaskSheet({
+  task,
+  open,
+  onOpenChange,
+  projectId,
+}: TaskSheetProps) {
   const [activeTab, setActiveTab] = React.useState('info')
 
   // Reset to info tab when a new task is selected
@@ -36,15 +44,18 @@ export function TaskSheet({ task, open, onOpenChange, projectId }: TaskSheetProp
 
   const status = statuses.find((s) => s.id === task.status) ?? statuses[0]
   // Check for logs in executionLogs relation (new) or old logs column
-  const hasLogs = task.status !== 'PENDING' && ((task.executionLogs?.events?.length ?? 0) > 0 || (task.logs?.length ?? 0) > 0)
+  const hasLogs =
+    task.status !== 'PENDING' &&
+    ((task.executionLogs?.events?.length ?? 0) > 0 ||
+      (task.logs?.length ?? 0) > 0)
   const isRunning = task.status === 'RUNNING'
   const logsDisabled = task.status === 'PENDING'
 
   return (
-    <Sheet  open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-lg rounded-l-xl rounded-r-none border-r-0 p-0 flex flex-col"
+        className="w-full sm:max-w-xl lg:max-w-2xl rounded-l-xl rounded-r-none rounded-br-none border-r-0 p-0 flex flex-col"
         showCloseButton={true}
       >
         <SheetHeader className="px-6 pt-5 pb-3 border-b border-border">
@@ -68,10 +79,7 @@ export function TaskSheet({ task, open, onOpenChange, projectId }: TaskSheetProp
               <HugeiconsIcon icon={InformationCircleIcon} size={14} />
               Info
             </TabsTrigger>
-            <TabsTrigger
-              value="logs"
-              disabled={logsDisabled}
-            >
+            <TabsTrigger value="logs" disabled={logsDisabled}>
               <HugeiconsIcon icon={CommandLineIcon} size={14} />
               Logs
             </TabsTrigger>

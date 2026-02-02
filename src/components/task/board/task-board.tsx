@@ -28,6 +28,9 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
   const [optimisticStatuses, setOptimisticStatuses] = React.useState<
     Record<string, TaskStatus>
   >({})
+  const [startingTaskIds, setStartingTaskIds] = React.useState<
+    Record<string, boolean>
+  >({})
 
   // Subscribe to execution events for real-time updates
   useExecutionEvents(projectId, {
@@ -35,20 +38,30 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
     onEvent: (event) => {
       if (
         event.type === 'task_started' ||
-        event.type === 'task_completed' ||
+        event.type === 'task_review' ||
         event.type === 'task_failed'
       ) {
-        setOptimisticStatuses((current) => {
+        setStartingTaskIds((current) => {
           if (!current[event.taskId]) return current
           const next = { ...current }
           delete next[event.taskId]
           return next
         })
+        const nextStatus: TaskStatus =
+          event.type === 'task_started'
+            ? 'RUNNING'
+            : event.type === 'task_review'
+              ? 'REVIEW'
+              : 'FAILED'
+        setOptimisticStatuses((current) => ({
+          ...current,
+          [event.taskId]: nextStatus,
+        }))
       }
       // On task status changes, revalidate from server (single source of truth)
       if (
         event.type === 'task_started' ||
-        event.type === 'task_completed' ||
+        event.type === 'task_review' ||
         event.type === 'task_failed'
       ) {
         router.invalidate()
@@ -131,19 +144,17 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
       const task = items.find((t) => t.id === taskId)
       if (!task) return
 
-      // Optimistically update UI to RUNNING
-      setOptimisticStatuses((current) => ({ ...current, [taskId]: 'RUNNING' }))
-      setItems((current) =>
-        current.map((t) =>
-          t.id === taskId
-            ? { ...t, status: 'RUNNING' as TaskStatus, attempts: 1 }
-            : t,
-        ),
-      )
+      setStartingTaskIds((current) => ({ ...current, [taskId]: true }))
 
       // For mock projects, simulate agent completing work after 3 seconds
       if (task.projectId === 'mock') {
         setTimeout(() => {
+          setStartingTaskIds((current) => {
+            if (!current[taskId]) return current
+            const next = { ...current }
+            delete next[taskId]
+            return next
+          })
           setItems((current) =>
             current.map((t) =>
               t.id === taskId ? { ...t, status: 'REVIEW' as TaskStatus } : t,
@@ -161,34 +172,30 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
         if (!result.success) {
           // Revert optimistic update on failure
           console.error('Failed to start task:', result.message)
-          setOptimisticStatuses((current) => {
+          setStartingTaskIds((current) => {
             const next = { ...current }
             delete next[taskId]
             return next
           })
-          setItems((current) =>
-            current.map((t) =>
-              t.id === taskId
-                ? { ...t, status: 'PENDING' as TaskStatus, attempts: 0 }
-                : t,
-            ),
-          )
+        } else {
+          setStartingTaskIds((current) => {
+            const next = { ...current }
+            delete next[taskId]
+            return next
+          })
+          setOptimisticStatuses((current) => ({
+            ...current,
+            [taskId]: 'RUNNING',
+          }))
         }
       } catch (error) {
         console.error('Failed to start task:', error)
         // Revert optimistic update on error
-        setOptimisticStatuses((current) => {
+        setStartingTaskIds((current) => {
           const next = { ...current }
           delete next[taskId]
           return next
         })
-        setItems((current) =>
-          current.map((t) =>
-            t.id === taskId
-              ? { ...t, status: 'PENDING' as TaskStatus, attempts: 0 }
-              : t,
-          ),
-        )
       }
     },
     [items],
@@ -209,6 +216,7 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
               key={status.id}
               status={status}
               tasks={tasksByStatus[status.id] || []}
+              startingTaskIds={startingTaskIds}
               onModelChange={handleModelChange}
               onStartTask={handleStartTask}
               onTaskClick={handleTaskClick}

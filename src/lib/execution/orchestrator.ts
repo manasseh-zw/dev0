@@ -34,6 +34,10 @@ type CompletionResult = {
   error?: string
 }
 
+type TaskClaimResult =
+  | { task: Task }
+  | { alreadyRunning: true; runningTaskId: string }
+
 const WORKSPACE_DIR = '$HOME/project'
 
 export async function startTask(
@@ -65,68 +69,21 @@ export async function startTask(
   console.log(`[ORCHESTRATOR] Set project state to starting`)
 
   try {
-    let task: Task | null = null
-
-    if (taskId) {
-      task = await getTaskById(projectId, taskId)
-      const updated = await claimPendingTask(task.id)
-      if (!updated) {
-        const status = await getTaskStatus(task.id)
-        const runningTaskId = await getRunningTaskId(projectId)
-        projectState.set(projectId, {
-          runningTaskId: runningTaskId ?? null,
-          sandboxId: null,
-          starting: false,
-        })
-        if (runningTaskId) {
-          return {
-            taskId: runningTaskId,
-            sandboxId: '',
-            alreadyRunning: true,
-          }
-        }
-        throw new Error(`Task is not pending (status: ${status ?? 'unknown'})`)
-      }
-    } else {
-      let lastFailedTaskId: string | null = null
-      let lastFailedStatus: Task['status'] | null = null
-
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        task = await getNextRunnableTask(projectId)
-        if (!task) {
-          throw new Error('No runnable task found for this project')
-        }
-        const updated = await claimPendingTask(task.id)
-        if (updated) {
-          break
-        }
-        lastFailedTaskId = task.id
-        lastFailedStatus = await getTaskStatus(task.id)
-        task = null
-      }
-
-      if (!task) {
-        const runningTaskId = await getRunningTaskId(projectId)
-        projectState.set(projectId, {
-          runningTaskId: runningTaskId ?? null,
-          sandboxId: null,
-          starting: false,
-        })
-        if (runningTaskId) {
-          return {
-            taskId: runningTaskId,
-            sandboxId: '',
-            alreadyRunning: true,
-          }
-        }
-        if (lastFailedTaskId) {
-          throw new Error(
-            `Unable to claim task ${lastFailedTaskId} (status: ${lastFailedStatus ?? 'unknown'})`,
-          )
-        }
-        throw new Error('Unable to claim a runnable task')
+    const claimResult = await claimTaskForExecution(projectId, taskId)
+    if ('alreadyRunning' in claimResult) {
+      projectState.set(projectId, {
+        runningTaskId: claimResult.runningTaskId,
+        sandboxId: null,
+        starting: false,
+      })
+      return {
+        taskId: claimResult.runningTaskId,
+        sandboxId: '',
+        alreadyRunning: true,
       }
     }
+
+    const task = claimResult.task
 
     let sandboxId = ''
 
@@ -139,24 +96,7 @@ export async function startTask(
       console.log(`[ORCHESTRATOR] Sandbox ready - sandboxId: ${sandboxId}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sandbox error'
-      await db
-        .update(tasks)
-        .set({
-          status: 'FAILED',
-          attempts: sql`${tasks.attempts} + 1`,
-        })
-        .where(eq(tasks.id, task.id))
-      executionBus.emit({
-        type: 'task_failed',
-        projectId,
-        taskId: task.id,
-        error: message,
-      })
-      projectState.set(projectId, {
-        runningTaskId: null,
-        sandboxId: null,
-        starting: false,
-      })
+      await handleTaskStartFailure(projectId, task.id, message)
       throw error
     }
 
@@ -209,13 +149,13 @@ export async function completeTask(
     await db
       .update(tasks)
       .set({
-        status: 'DONE',
+        status: 'REVIEW',
         prUrl: result.prUrl ?? null,
       })
       .where(eq(tasks.id, taskId))
 
     executionBus.emit({
-      type: 'task_completed',
+      type: 'task_review',
       projectId,
       taskId,
       prUrl: result.prUrl,
@@ -297,6 +237,35 @@ async function runTaskExecution(
     console.log(`[ORCHESTRATOR] Built prompt, executing Gemini CLI...`)
 
     let stdoutBuffer = ''
+    const handleStdoutLine = (line: string) => {
+      if (!line.trim()) return
+      try {
+        const parsed = JSON.parse(line)
+        const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
+
+        if (geminiEvent) {
+          console.log(`[GEMINI] Event: ${geminiEvent.type}`)
+          collectedEvents.push(geminiEvent)
+        }
+
+        executionBus.emit({
+          type: 'task_log',
+          projectId,
+          taskId: task.id,
+          log: line,
+          stream: 'stdout',
+          geminiEvent,
+        })
+      } catch {
+        executionBus.emit({
+          type: 'task_log',
+          projectId,
+          taskId: task.id,
+          log: line,
+          stream: 'stdout',
+        })
+      }
+    }
     const result = await executeGeminiStreaming(
       sandboxId,
       {
@@ -312,36 +281,7 @@ async function runTaskExecution(
           const lines = stdoutBuffer.split('\n')
           stdoutBuffer = lines.pop() ?? ''
           for (const line of lines) {
-            if (!line.trim()) continue
-            try {
-              const parsed = JSON.parse(line)
-              const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
-
-              if (geminiEvent) {
-                console.log(`[GEMINI] Event: ${geminiEvent.type}`)
-                collectedEvents.push(geminiEvent)
-              }
-
-              executionBus.emit({
-                type: 'task_log',
-                projectId,
-                taskId: task.id,
-                log: line,
-                stream: 'stdout',
-                geminiEvent,
-              })
-            } catch {
-              // Fallback for non-JSON lines (startup messages, etc.)
-              if (line.trim()) {
-                executionBus.emit({
-                  type: 'task_log',
-                  projectId,
-                  taskId: task.id,
-                  log: line,
-                  stream: 'stdout',
-                })
-              }
-            }
+            handleStdoutLine(line)
           }
         },
         onStderr: (chunk) => {
@@ -358,31 +298,7 @@ async function runTaskExecution(
           if (!stdoutBuffer.trim()) return
           const line = stdoutBuffer.trim()
           stdoutBuffer = ''
-          try {
-            const parsed = JSON.parse(line)
-            const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
-
-            if (geminiEvent) {
-              collectedEvents.push(geminiEvent)
-            }
-
-            executionBus.emit({
-              type: 'task_log',
-              projectId,
-              taskId: task.id,
-              log: line,
-              stream: 'stdout',
-              geminiEvent,
-            })
-          } catch {
-            executionBus.emit({
-              type: 'task_log',
-              projectId,
-              taskId: task.id,
-              log: line,
-              stream: 'stdout',
-            })
-          }
+          handleStdoutLine(line)
         },
       },
     )
@@ -490,6 +406,7 @@ async function finalizeTaskChanges(
 
   const remoteUrl = withGithubToken(project.repoUrl, project.repoName)
   if (!remoteUrl) {
+    console.log('[ORCHESTRATOR] finalizeTaskChanges: missing repository URL')
     return { error: 'Missing repository URL' }
   }
 
@@ -499,6 +416,14 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (remoteResult.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: git remote set-url failed (exit ${remoteResult.exitCode})`,
+    )
+    if (remoteResult.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: git remote stderr: ${remoteResult.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'Failed to set authenticated remote' }
   }
 
@@ -514,6 +439,14 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (gitConfig.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: git config failed (exit ${gitConfig.exitCode})`,
+    )
+    if (gitConfig.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: git config stderr: ${gitConfig.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'Failed to configure git user' }
   }
 
@@ -523,6 +456,14 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (prepareBranch.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: git checkout failed (exit ${prepareBranch.exitCode})`,
+    )
+    if (prepareBranch.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: git checkout stderr: ${prepareBranch.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'Failed to create branch' }
   }
 
@@ -530,6 +471,14 @@ async function finalizeTaskChanges(
     cwd: WORKSPACE_DIR,
   })
   if (addResult.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: git add failed (exit ${addResult.exitCode})`,
+    )
+    if (addResult.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: git add stderr: ${addResult.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'Failed to stage changes' }
   }
 
@@ -539,6 +488,7 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (diffResult.exitCode === 0) {
+    console.log('[ORCHESTRATOR] finalizeTaskChanges: no staged changes')
     return { error: 'No changes to commit' }
   }
 
@@ -550,6 +500,14 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (commitResult.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: git commit failed (exit ${commitResult.exitCode})`,
+    )
+    if (commitResult.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: git commit stderr: ${commitResult.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'Git commit failed' }
   }
 
@@ -559,6 +517,14 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (pushResult.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: git push failed (exit ${pushResult.exitCode})`,
+    )
+    if (pushResult.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: git push stderr: ${pushResult.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'Git push failed' }
   }
 
@@ -570,10 +536,26 @@ async function finalizeTaskChanges(
     { cwd: WORKSPACE_DIR },
   )
   if (prResult.exitCode !== 0) {
+    console.log(
+      `[ORCHESTRATOR] finalizeTaskChanges: gh pr create failed (exit ${prResult.exitCode})`,
+    )
+    if (prResult.stdout) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: gh pr stdout: ${prResult.stdout.slice(0, 400)}`,
+      )
+    }
+    if (prResult.stderr) {
+      console.log(
+        `[ORCHESTRATOR] finalizeTaskChanges: gh pr stderr: ${prResult.stderr.slice(0, 400)}`,
+      )
+    }
     return { error: 'gh pr create failed' }
   }
 
   const prUrl = extractPrUrl(`${prResult.stdout}\n${prResult.stderr}`)
+  console.log(
+    `[ORCHESTRATOR] finalizeTaskChanges: pr created ${prUrl ?? 'unknown'}`,
+  )
   return { prUrl }
 }
 
@@ -790,4 +772,78 @@ async function claimPendingTask(taskId: string): Promise<boolean> {
     .returning()
 
   return Boolean(updated[0])
+}
+
+async function handleTaskStartFailure(
+  projectId: string,
+  taskId: string,
+  message: string,
+): Promise<void> {
+  await db
+    .update(tasks)
+    .set({
+      status: 'FAILED',
+      attempts: sql`${tasks.attempts} + 1`,
+    })
+    .where(eq(tasks.id, taskId))
+
+  executionBus.emit({
+    type: 'task_failed',
+    projectId,
+    taskId,
+    error: message,
+  })
+
+  projectState.set(projectId, {
+    runningTaskId: null,
+    sandboxId: null,
+    starting: false,
+  })
+}
+
+async function claimTaskForExecution(
+  projectId: string,
+  taskId?: string,
+): Promise<TaskClaimResult> {
+  if (taskId) {
+    const task = await getTaskById(projectId, taskId)
+    const updated = await claimPendingTask(task.id)
+    if (updated) {
+      return { task }
+    }
+
+    const status = await getTaskStatus(task.id)
+    const runningTaskId = await getRunningTaskId(projectId)
+    if (runningTaskId) {
+      return { alreadyRunning: true, runningTaskId }
+    }
+    throw new Error(`Task is not pending (status: ${status ?? 'unknown'})`)
+  }
+
+  let lastFailedTaskId: string | null = null
+  let lastFailedStatus: Task['status'] | null = null
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const task = await getNextRunnableTask(projectId)
+    if (!task) {
+      throw new Error('No runnable task found for this project')
+    }
+    const updated = await claimPendingTask(task.id)
+    if (updated) {
+      return { task }
+    }
+    lastFailedTaskId = task.id
+    lastFailedStatus = await getTaskStatus(task.id)
+  }
+
+  const runningTaskId = await getRunningTaskId(projectId)
+  if (runningTaskId) {
+    return { alreadyRunning: true, runningTaskId }
+  }
+  if (lastFailedTaskId) {
+    throw new Error(
+      `Unable to claim task ${lastFailedTaskId} (status: ${lastFailedStatus ?? 'unknown'})`,
+    )
+  }
+  throw new Error('Unable to claim a runnable task')
 }

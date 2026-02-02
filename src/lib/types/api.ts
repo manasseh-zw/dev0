@@ -94,7 +94,7 @@ export type GitHubPREvent = {
 export type SSEEvent =
   | { type: 'task_started'; taskId: string; sandboxId: string }
   | { type: 'task_log'; taskId: string; log: string; level: string }
-  | { type: 'task_completed'; taskId: string; prUrl?: string }
+  | { type: 'task_review'; taskId: string; prUrl?: string }
   | { type: 'task_failed'; taskId: string; error: string }
   | { type: 'project_updated'; projectId: string }
 
