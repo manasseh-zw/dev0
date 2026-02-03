@@ -7,11 +7,18 @@ import { GitHubProvider } from '@/lib/git/github'
 import { env } from '@/lib/env'
 import {
   getMockPRDetails,
+  getMockPRFiles,
   getMockProject,
   hasMockPRDetails,
+  hasMockPRFiles,
   isMockProjectId,
 } from '@/data/mock'
-import type { ReviewPRComment, ReviewPRListItem, ReviewPRSummary } from '@/lib/types/review'
+import type {
+  ReviewPRComment,
+  ReviewPRFile,
+  ReviewPRListItem,
+  ReviewPRSummary,
+} from '@/lib/types/review'
 
 type PullRequestRef = {
   owner: string
@@ -74,12 +81,14 @@ function mapCommentAuthorType(author: string) {
   return author === env.GITHUB_BOT_USERNAME ? 'agent' : 'user'
 }
 
-function mapComments(comments: Array<{
-  id: number | string
-  body?: string | null
-  user?: { login?: string | null } | null
-  created_at?: string | null
-}>): ReviewPRComment[] {
+function mapComments(
+  comments: Array<{
+    id: number | string
+    body?: string | null
+    user?: { login?: string | null } | null
+    created_at?: string | null
+  }>,
+): ReviewPRComment[] {
   return comments
     .filter((comment) => Boolean(comment.body))
     .map((comment) => {
@@ -120,14 +129,19 @@ export const getReviewPRSummary = createServerFn({ method: 'GET' })
       })
       .from(tasks)
       .leftJoin(projects, eq(tasks.projectId, projects.id))
-      .where(and(eq(tasks.id, data.taskId), eq(tasks.projectId, data.projectId)))
+      .where(
+        and(eq(tasks.id, data.taskId), eq(tasks.projectId, data.projectId)),
+      )
       .limit(1)
 
     if (!row) {
       throw new Error('Task not found')
     }
 
-    const repoRef = resolvePullRequestRef(row.task, row.project?.repoName ?? null)
+    const repoRef = resolvePullRequestRef(
+      row.task,
+      row.project?.repoName ?? null,
+    )
     if (!repoRef) {
       return null
     }
@@ -239,8 +253,7 @@ export const getReviewPRList = createServerFn({ method: 'GET' })
         const pr = prMap.get(prNumber)
         if (!pr) return
 
-        const merged =
-          'merged_at' in pr ? Boolean(pr.merged_at) : false
+        const merged = 'merged_at' in pr ? Boolean(pr.merged_at) : false
 
         listItems.push({
           taskId: task.id,
@@ -287,4 +300,126 @@ export const getReviewPRList = createServerFn({ method: 'GET' })
     }
 
     return listItems
+  })
+
+export const getReviewPRFiles = createServerFn({ method: 'GET' })
+  .inputValidator(
+    z.object({
+      projectId: z.string(),
+      taskId: z.string(),
+    }),
+  )
+  .handler(async ({ data }): Promise<ReviewPRFile[]> => {
+    // Handle mock data
+    if (isMockProjectId(data.projectId)) {
+      if (hasMockPRFiles(data.taskId)) {
+        return getMockPRFiles(data.taskId)
+      }
+      return []
+    }
+
+    const [row] = await db
+      .select({
+        task: tasks,
+        project: projects,
+      })
+      .from(tasks)
+      .leftJoin(projects, eq(tasks.projectId, projects.id))
+      .where(
+        and(eq(tasks.id, data.taskId), eq(tasks.projectId, data.projectId)),
+      )
+      .limit(1)
+
+    if (!row) {
+      throw new Error('Task not found')
+    }
+
+    const repoRef = resolvePullRequestRef(
+      row.task,
+      row.project?.repoName ?? null,
+    )
+    if (!repoRef) {
+      return []
+    }
+
+    const github = new GitHubProvider()
+    const filesResponse = await github.listPullRequestFiles({
+      owner: repoRef.owner,
+      repoName: repoRef.repoName,
+      prNumber: repoRef.prNumber,
+    })
+
+    return filesResponse.data.map((file) => ({
+      filename: file.filename,
+      status: file.status as ReviewPRFile['status'],
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+      sha: file.sha ?? '',
+      patch: file.patch ?? null,
+      previousFilename: file.previous_filename ?? null,
+    }))
+  })
+
+export const mergePullRequest = createServerFn({ method: 'POST' })
+  .inputValidator(
+    z.object({
+      projectId: z.string(),
+      taskId: z.string(),
+    }),
+  )
+  .handler(async ({ data }): Promise<{ success: boolean; message: string }> => {
+    // Mock data - simulate merge
+    if (isMockProjectId(data.projectId)) {
+      return {
+        success: true,
+        message: 'Pull request merged successfully (mock)',
+      }
+    }
+
+    const [row] = await db
+      .select({
+        task: tasks,
+        project: projects,
+      })
+      .from(tasks)
+      .leftJoin(projects, eq(tasks.projectId, projects.id))
+      .where(
+        and(eq(tasks.id, data.taskId), eq(tasks.projectId, data.projectId)),
+      )
+      .limit(1)
+
+    if (!row) {
+      throw new Error('Task not found')
+    }
+
+    const repoRef = resolvePullRequestRef(
+      row.task,
+      row.project?.repoName ?? null,
+    )
+    if (!repoRef) {
+      throw new Error('Pull request reference not found')
+    }
+
+    const github = new GitHubProvider()
+
+    try {
+      await github.mergePullRequest({
+        repoName: repoRef.repoName,
+        prNumber: repoRef.prNumber,
+        mergeMethod: 'squash',
+      })
+
+      // Update task status to DONE
+      await db
+        .update(tasks)
+        .set({ status: 'DONE' })
+        .where(eq(tasks.id, data.taskId))
+
+      return { success: true, message: 'Pull request merged successfully' }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to merge pull request'
+      return { success: false, message }
+    }
   })

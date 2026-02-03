@@ -37,4 +37,5 @@ export { getMockTaskStats, getMockTasksByPhase, getMockTasksByStatus }
 export { mockProject, mockTasksWithBlocked }
 export { MOCK_TASK_IDS } from './tasks'
 export { getMockPRDetails, hasMockPRDetails } from './pr-details'
+export { getMockPRFiles, hasMockPRFiles } from './pr-files'
 export { getMockExecutionLogs, hasMockExecutionLogs } from './execution-logs'

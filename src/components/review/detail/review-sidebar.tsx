@@ -2,7 +2,7 @@
 
 import type { Task } from '@/lib/types'
 import type { ReviewPRSummary } from '@/lib/types/review'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   UserIcon,
@@ -10,6 +10,7 @@ import {
   LinkSquare01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { Link } from '@tanstack/react-router'
 
 interface ReviewSidebarProps {
   task: Task
@@ -23,17 +24,30 @@ export function ReviewSidebar({ task, prDetails }: ReviewSidebarProps) {
   return (
     <div className="w-72 shrink-0 border-l border-border bg-muted/30 p-6 space-y-4 hidden lg:block overflow-y-auto">
       {/* Review Now Button */}
-      <Button
-        size="lg"
-        className={cn(
-          'w-full  text-sm font-medium gap-2',
-          isMerged && 'opacity-50 cursor-not-allowed',
-        )}
-        disabled={isMerged}
-      >
-        <HugeiconsIcon icon={ViewIcon} size={18} />
-        {isMerged ? 'Already Merged' : 'Review Now'}
-      </Button>
+      {isMerged ? (
+        <Button
+          size="lg"
+          className={cn(
+            'w-full text-sm font-medium gap-2 opacity-50 cursor-not-allowed',
+          )}
+          disabled
+        >
+          <HugeiconsIcon icon={ViewIcon} size={18} />
+          Already Merged
+        </Button>
+      ) : (
+        <Link
+          to="/project/$projectId/review/$taskId/diff"
+          params={{ projectId: task.projectId, taskId: task.id }}
+          className={cn(
+            buttonVariants({ size: 'lg' }),
+            'w-full text-sm font-medium gap-2',
+          )}
+        >
+          <HugeiconsIcon icon={ViewIcon} size={18} />
+          Review Now
+        </Link>
+      )}
 
       {/* View on GitHub */}
       {task.prUrl && (

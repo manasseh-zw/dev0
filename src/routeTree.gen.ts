@@ -20,6 +20,8 @@ import { Route as ProjectProjectIdPreviewRouteImport } from './routes/project/$p
 import { Route as ApiEventsProjectIdRouteImport } from './routes/api/events/$projectId'
 import { Route as ProjectProjectIdReviewIndexRouteImport } from './routes/project/$projectId/review/index'
 import { Route as ProjectProjectIdReviewTaskIdRouteImport } from './routes/project/$projectId/review/$taskId'
+import { Route as ProjectProjectIdReviewTaskIdIndexRouteImport } from './routes/project/$projectId/review/$taskId/index'
+import { Route as ProjectProjectIdReviewTaskIdDiffRouteImport } from './routes/project/$projectId/review/$taskId/diff'
 
 const ProjectRoute = ProjectRouteImport.update({
   id: '/project',
@@ -78,6 +80,18 @@ const ProjectProjectIdReviewTaskIdRoute =
     path: '/$taskId',
     getParentRoute: () => ProjectProjectIdReviewRoute,
   } as any)
+const ProjectProjectIdReviewTaskIdIndexRoute =
+  ProjectProjectIdReviewTaskIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => ProjectProjectIdReviewTaskIdRoute,
+  } as any)
+const ProjectProjectIdReviewTaskIdDiffRoute =
+  ProjectProjectIdReviewTaskIdDiffRouteImport.update({
+    id: '/diff',
+    path: '/diff',
+    getParentRoute: () => ProjectProjectIdReviewTaskIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,8 +103,10 @@ export interface FileRoutesByFullPath {
   '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
   '/project/$projectId/review': typeof ProjectProjectIdReviewRouteWithChildren
   '/project/$projectId/': typeof ProjectProjectIdIndexRoute
-  '/project/$projectId/review/$taskId': typeof ProjectProjectIdReviewTaskIdRoute
+  '/project/$projectId/review/$taskId': typeof ProjectProjectIdReviewTaskIdRouteWithChildren
   '/project/$projectId/review/': typeof ProjectProjectIdReviewIndexRoute
+  '/project/$projectId/review/$taskId/diff': typeof ProjectProjectIdReviewTaskIdDiffRoute
+  '/project/$projectId/review/$taskId/': typeof ProjectProjectIdReviewTaskIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -100,8 +116,9 @@ export interface FileRoutesByTo {
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
   '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
   '/project/$projectId': typeof ProjectProjectIdIndexRoute
-  '/project/$projectId/review/$taskId': typeof ProjectProjectIdReviewTaskIdRoute
   '/project/$projectId/review': typeof ProjectProjectIdReviewIndexRoute
+  '/project/$projectId/review/$taskId/diff': typeof ProjectProjectIdReviewTaskIdDiffRoute
+  '/project/$projectId/review/$taskId': typeof ProjectProjectIdReviewTaskIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -114,8 +131,10 @@ export interface FileRoutesById {
   '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
   '/project/$projectId/review': typeof ProjectProjectIdReviewRouteWithChildren
   '/project/$projectId/': typeof ProjectProjectIdIndexRoute
-  '/project/$projectId/review/$taskId': typeof ProjectProjectIdReviewTaskIdRoute
+  '/project/$projectId/review/$taskId': typeof ProjectProjectIdReviewTaskIdRouteWithChildren
   '/project/$projectId/review/': typeof ProjectProjectIdReviewIndexRoute
+  '/project/$projectId/review/$taskId/diff': typeof ProjectProjectIdReviewTaskIdDiffRoute
+  '/project/$projectId/review/$taskId/': typeof ProjectProjectIdReviewTaskIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +150,8 @@ export interface FileRouteTypes {
     | '/project/$projectId/'
     | '/project/$projectId/review/$taskId'
     | '/project/$projectId/review/'
+    | '/project/$projectId/review/$taskId/diff'
+    | '/project/$projectId/review/$taskId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -140,8 +161,9 @@ export interface FileRouteTypes {
     | '/api/events/$projectId'
     | '/project/$projectId/preview'
     | '/project/$projectId'
-    | '/project/$projectId/review/$taskId'
     | '/project/$projectId/review'
+    | '/project/$projectId/review/$taskId/diff'
+    | '/project/$projectId/review/$taskId'
   id:
     | '__root__'
     | '/'
@@ -155,6 +177,8 @@ export interface FileRouteTypes {
     | '/project/$projectId/'
     | '/project/$projectId/review/$taskId'
     | '/project/$projectId/review/'
+    | '/project/$projectId/review/$taskId/diff'
+    | '/project/$projectId/review/$taskId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -244,17 +268,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectProjectIdReviewTaskIdRouteImport
       parentRoute: typeof ProjectProjectIdReviewRoute
     }
+    '/project/$projectId/review/$taskId/': {
+      id: '/project/$projectId/review/$taskId/'
+      path: '/'
+      fullPath: '/project/$projectId/review/$taskId/'
+      preLoaderRoute: typeof ProjectProjectIdReviewTaskIdIndexRouteImport
+      parentRoute: typeof ProjectProjectIdReviewTaskIdRoute
+    }
+    '/project/$projectId/review/$taskId/diff': {
+      id: '/project/$projectId/review/$taskId/diff'
+      path: '/diff'
+      fullPath: '/project/$projectId/review/$taskId/diff'
+      preLoaderRoute: typeof ProjectProjectIdReviewTaskIdDiffRouteImport
+      parentRoute: typeof ProjectProjectIdReviewTaskIdRoute
+    }
   }
 }
 
+interface ProjectProjectIdReviewTaskIdRouteChildren {
+  ProjectProjectIdReviewTaskIdDiffRoute: typeof ProjectProjectIdReviewTaskIdDiffRoute
+  ProjectProjectIdReviewTaskIdIndexRoute: typeof ProjectProjectIdReviewTaskIdIndexRoute
+}
+
+const ProjectProjectIdReviewTaskIdRouteChildren: ProjectProjectIdReviewTaskIdRouteChildren =
+  {
+    ProjectProjectIdReviewTaskIdDiffRoute:
+      ProjectProjectIdReviewTaskIdDiffRoute,
+    ProjectProjectIdReviewTaskIdIndexRoute:
+      ProjectProjectIdReviewTaskIdIndexRoute,
+  }
+
+const ProjectProjectIdReviewTaskIdRouteWithChildren =
+  ProjectProjectIdReviewTaskIdRoute._addFileChildren(
+    ProjectProjectIdReviewTaskIdRouteChildren,
+  )
+
 interface ProjectProjectIdReviewRouteChildren {
-  ProjectProjectIdReviewTaskIdRoute: typeof ProjectProjectIdReviewTaskIdRoute
+  ProjectProjectIdReviewTaskIdRoute: typeof ProjectProjectIdReviewTaskIdRouteWithChildren
   ProjectProjectIdReviewIndexRoute: typeof ProjectProjectIdReviewIndexRoute
 }
 
 const ProjectProjectIdReviewRouteChildren: ProjectProjectIdReviewRouteChildren =
   {
-    ProjectProjectIdReviewTaskIdRoute: ProjectProjectIdReviewTaskIdRoute,
+    ProjectProjectIdReviewTaskIdRoute:
+      ProjectProjectIdReviewTaskIdRouteWithChildren,
     ProjectProjectIdReviewIndexRoute: ProjectProjectIdReviewIndexRoute,
   }
 

@@ -21,10 +21,13 @@ function ReviewPage() {
   const normalizedPathname = pathname.replace(/\/$/, '')
   const listPath = `/project/${projectId}/review`
   const isDetailView = normalizedPathname !== listPath
+  const isDiffView = normalizedPathname.endsWith('/diff')
 
   return (
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
-      {isDetailView ? (
+      {!isDetailView && <ReviewSubHeader />}
+
+      {isDetailView && !isDiffView && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 lg:px-6 py-3 border-b border-border bg-background">
           <div className="flex items-center gap-2 shrink-0">
             <Link
@@ -40,13 +43,18 @@ function ReviewPage() {
             </Link>
           </div>
         </div>
-      ) : (
-        <ReviewSubHeader />
       )}
-      <main className="flex-1 w-full overflow-y-auto">
+
+      {/* Main content - full height for detail view, scrollable for list view */}
+      <main
+        className={
+          isDetailView
+            ? 'flex-1 overflow-hidden'
+            : 'flex-1 w-full overflow-y-auto'
+        }
+      >
         <Outlet />
       </main>
     </div>
   )
 }
-

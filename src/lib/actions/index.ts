@@ -24,4 +24,9 @@ export { transcribe } from './transcribe'
 export { startExecution, stopExecution } from './execution'
 
 // Review Actions
-export { getReviewPRList, getReviewPRSummary } from './review'
+export {
+  getReviewPRList,
+  getReviewPRSummary,
+  getReviewPRFiles,
+  mergePullRequest,
+} from './review'

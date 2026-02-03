@@ -33,7 +33,7 @@ export function PrLine({ item, reviewStatus, layoutId = false }: PrLineProps) {
 
   return (
     <Link
-      to="/project/$projectId/review/$taskId"
+      to="/project/$projectId/review/$taskId/"
       params={{ projectId, taskId: item.taskId }}
     >
       <motion.div
