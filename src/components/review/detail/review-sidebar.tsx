@@ -1,7 +1,7 @@
 'use client'
 
 import type { Task } from '@/lib/types'
-import type { MockPRDetails } from '@/data/mock/pr-details'
+import type { ReviewPRSummary } from '@/lib/types/review'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -13,7 +13,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 
 interface ReviewSidebarProps {
   task: Task
-  prDetails: MockPRDetails | null
+  prDetails: ReviewPRSummary | null
 }
 
 export function ReviewSidebar({ task, prDetails }: ReviewSidebarProps) {

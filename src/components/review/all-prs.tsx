@@ -1,6 +1,6 @@
 'use client';
 
-import type { Task } from '@/lib/types';
+import type { ReviewPRListItem } from '@/lib/types/review';
 import { useMemo } from 'react';
 import { ReviewGroup } from './review-group';
 import {
@@ -9,7 +9,7 @@ import {
 } from './review-statuses';
 
 interface AllPrsProps {
-  tasks: Task[];
+  items: ReviewPRListItem[];
 }
 
 /**
@@ -18,8 +18,8 @@ interface AllPrsProps {
  * - DONE -> ACCEPTED (green)
  * - FAILED -> REJECTED (red)
  */
-function getReviewStatus(task: Task): ReviewStatus | null {
-  switch (task.status) {
+function getReviewStatus(item: ReviewPRListItem): ReviewStatus | null {
+  switch (item.taskStatus) {
     case 'REVIEW':
       return 'PENDING_REVIEW';
     case 'DONE':
@@ -31,27 +31,24 @@ function getReviewStatus(task: Task): ReviewStatus | null {
   }
 }
 
-export function AllPrs({ tasks }: AllPrsProps) {
+export function AllPrs({ items }: AllPrsProps) {
   // Filter tasks that have PRs and group by review status
   const prsByStatus = useMemo(() => {
-    const result: Record<ReviewStatus, Task[]> = {
+    const result: Record<ReviewStatus, ReviewPRListItem[]> = {
       PENDING_REVIEW: [],
       ACCEPTED: [],
       REJECTED: [],
     };
 
-    // Only include tasks that have a PR URL
-    const tasksWithPrs = tasks.filter((task) => task.prUrl);
-
-    tasksWithPrs.forEach((task) => {
-      const reviewStatus = getReviewStatus(task);
+    items.forEach((item) => {
+      const reviewStatus = getReviewStatus(item);
       if (reviewStatus) {
-        result[reviewStatus].push(task);
+        result[reviewStatus].push(item);
       }
     });
 
     return result;
-  }, [tasks]);
+  }, [items]);
 
   return (
     <div className="w-full h-full overflow-y-auto">
@@ -59,7 +56,7 @@ export function AllPrs({ tasks }: AllPrsProps) {
         <ReviewGroup
           key={status.id}
           status={status}
-          tasks={prsByStatus[status.id] || []}
+          items={prsByStatus[status.id] || []}
           count={prsByStatus[status.id]?.length || 0}
         />
       ))}

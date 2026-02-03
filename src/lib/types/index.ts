@@ -8,3 +8,5 @@ export * from '@/lib/types/api'
 export * from '@/lib/types/task'
 
 export * from '@/lib/types/gemini-stream'
+
+export * from '@/lib/types/review'

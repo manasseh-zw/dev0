@@ -1,6 +1,6 @@
 'use client';
 
-import type { Task } from '@/lib/types';
+import type { ReviewPRListItem } from '@/lib/types/review';
 import type { ReviewStatusConfig } from './review-statuses';
 import { PrLine } from './pr-line';
 import { Plus } from 'lucide-react';
@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 
 interface ReviewGroupProps {
   status: ReviewStatusConfig;
-  tasks: Task[];
+  items: ReviewPRListItem[];
   count: number;
 }
 
-export function ReviewGroup({ status, tasks, count }: ReviewGroupProps) {
+export function ReviewGroup({ status, items, count }: ReviewGroupProps) {
   return (
     <div className="bg-container">
       {/* Header */}
@@ -37,10 +37,10 @@ export function ReviewGroup({ status, tasks, count }: ReviewGroupProps) {
 
       {/* PR List */}
       <div className="space-y-0">
-        {tasks.map((task) => (
+        {items.map((item) => (
           <PrLine
-            key={task.id}
-            task={task}
+            key={item.taskId}
+            item={item}
             reviewStatus={status}
             layoutId={true}
           />

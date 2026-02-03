@@ -40,6 +40,34 @@ type MergePullRequestOptions = {
   mergeMethod?: 'merge' | 'squash' | 'rebase'
 }
 
+type PullRequestRef = {
+  owner?: string
+  repoName: string
+  prNumber: number
+}
+
+type ListPullRequestsOptions = {
+  owner?: string
+  repoName: string
+  state?: 'open' | 'closed' | 'all'
+  perPage?: number
+  page?: number
+}
+
+type ListPullRequestCommentsOptions = {
+  owner?: string
+  repoName: string
+  prNumber: number
+}
+
+type ListPullRequestFilesOptions = {
+  owner?: string
+  repoName: string
+  prNumber: number
+  perPage?: number
+  page?: number
+}
+
 type RepoInfo = {
   name: string
   fullName: string
@@ -66,6 +94,9 @@ export class GitHubProvider {
     this.owner = env.GITHUB_BOT_USERNAME
   }
 
+  private resolveOwner(owner?: string) {
+    return owner ?? this.owner
+  }
 
   async createFromTemplate(
     options: CreateRepoFromTemplateOptions,
@@ -201,6 +232,73 @@ export class GitHubProvider {
     }
   }
 
+  async getPullRequest(options: PullRequestRef) {
+    const { owner, repoName, prNumber } = options
+    const resolvedOwner = this.resolveOwner(owner)
+
+    return this.octokit.rest.pulls.get({
+      owner: resolvedOwner,
+      repo: repoName,
+      pull_number: prNumber,
+    })
+  }
+
+  async listPullRequests(options: ListPullRequestsOptions) {
+    const {
+      owner,
+      repoName,
+      state = 'all',
+      perPage = 100,
+      page = 1,
+    } = options
+    const resolvedOwner = this.resolveOwner(owner)
+
+    return this.octokit.rest.pulls.list({
+      owner: resolvedOwner,
+      repo: repoName,
+      state,
+      per_page: perPage,
+      page,
+    })
+  }
+
+  async listPullRequestComments(options: ListPullRequestCommentsOptions) {
+    const { owner, repoName, prNumber } = options
+    const resolvedOwner = this.resolveOwner(owner)
+
+    const [issueComments, reviewComments] = await Promise.all([
+      this.octokit.rest.issues.listComments({
+        owner: resolvedOwner,
+        repo: repoName,
+        issue_number: prNumber,
+        per_page: 100,
+      }),
+      this.octokit.rest.pulls.listReviewComments({
+        owner: resolvedOwner,
+        repo: repoName,
+        pull_number: prNumber,
+        per_page: 100,
+      }),
+    ])
+
+    return {
+      issueComments: issueComments.data,
+      reviewComments: reviewComments.data,
+    }
+  }
+
+  async listPullRequestFiles(options: ListPullRequestFilesOptions) {
+    const { owner, repoName, prNumber, perPage = 100, page = 1 } = options
+    const resolvedOwner = this.resolveOwner(owner)
+
+    return this.octokit.rest.pulls.listFiles({
+      owner: resolvedOwner,
+      repo: repoName,
+      pull_number: prNumber,
+      per_page: perPage,
+      page,
+    })
+  }
   /**
    * Upload or update a single file in a repository
    */

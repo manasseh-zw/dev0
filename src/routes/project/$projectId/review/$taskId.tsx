@@ -1,10 +1,7 @@
 import { createFileRoute, Link, useParams } from '@tanstack/react-router'
 import { Route as ProjectRoute } from '../../$projectId'
-import {
-  getMockProject,
-  getMockPRDetails,
-  isMockProjectId,
-} from '@/data/mock'
+import { getReviewPRSummary } from '@/lib/actions'
+import { getMockProject, isMockProjectId } from '@/data/mock'
 import { ReviewDetailHeader } from '@/components/review/detail/review-detail-header'
 import { ReviewDetailContent } from '@/components/review/detail/review-detail-content'
 import { ReviewSidebar } from '@/components/review/detail/review-sidebar'
@@ -14,6 +11,11 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/project/$projectId/review/$taskId')({
+  loader: async ({ params }) => {
+    return getReviewPRSummary({
+      data: { projectId: params.projectId, taskId: params.taskId },
+    })
+  },
   component: ReviewDetailPage,
 })
 
@@ -28,8 +30,7 @@ function ReviewDetailPage() {
   // Find the task
   const task = project.tasks.find((t) => t.id === taskId)
 
-  // Get mock PR details
-  const prDetails = task ? getMockPRDetails(task.id) : null
+  const prDetails = Route.useLoaderData()
 
   if (!task) {
     return (

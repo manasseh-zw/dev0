@@ -1,7 +1,7 @@
 'use client'
 
 import type { Task } from '@/lib/types'
-import type { MockPRDetails } from '@/data/mock/pr-details'
+import type { ReviewPRSummary } from '@/lib/types/review'
 import { MessageResponse } from '@/components/ai-elements/message'
 import { format } from 'date-fns'
 import { UserIcon } from '@hugeicons/core-free-icons'
@@ -9,7 +9,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 
 interface DetailsTabProps {
   task: Task
-  prDetails: MockPRDetails | null
+  prDetails: ReviewPRSummary | null
 }
 
 // We keep task in props for future use (e.g., showing task-specific info)
@@ -28,7 +28,7 @@ export function DetailsTab({ task: _task, prDetails }: DetailsTabProps) {
     <div className="space-y-6">
       {/* PR Body */}
       <div className="prose prose-sm dark:prose-invert max-w-none">
-        <MessageResponse>{prDetails.body}</MessageResponse>
+        <MessageResponse>{prDetails.body ?? ''}</MessageResponse>
       </div>
 
       {/* Comments section */}

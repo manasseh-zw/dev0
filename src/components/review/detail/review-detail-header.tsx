@@ -1,7 +1,7 @@
 'use client'
 
 import type { Task } from '@/lib/types'
-import type { MockPRDetails } from '@/data/mock/pr-details'
+import type { ReviewPRSummary } from '@/lib/types/review'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { GitMergeIcon, GitPullRequestIcon } from '@hugeicons/core-free-icons'
@@ -9,7 +9,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 
 interface ReviewDetailHeaderProps {
   task: Task
-  prDetails: MockPRDetails | null
+  prDetails: ReviewPRSummary | null
 }
 
 export function ReviewDetailHeader({

@@ -1,7 +1,7 @@
 'use client'
 
 import type { Task } from '@/lib/types'
-import type { MockPRDetails } from '@/data/mock/pr-details'
+import type { ReviewPRSummary } from '@/lib/types/review'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DetailsTab } from './details-tab'
 import { ActivityTab } from './activity-tab'
@@ -11,7 +11,7 @@ import * as React from 'react'
 
 interface ReviewDetailContentProps {
   task: Task
-  prDetails: MockPRDetails | null
+  prDetails: ReviewPRSummary | null
 }
 
 export function ReviewDetailContent({

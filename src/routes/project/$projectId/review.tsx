@@ -18,8 +18,9 @@ export const Route = createFileRoute('/project/$projectId/review')({
 function ReviewPage() {
   const { pathname } = useLocation()
   const { projectId } = useParams({ from: '/project/$projectId/review' })
-  const isDetailView =
-    pathname.includes('/review/') && !pathname.endsWith('/review')
+  const normalizedPathname = pathname.replace(/\/$/, '')
+  const listPath = `/project/${projectId}/review`
+  const isDetailView = normalizedPathname !== listPath
 
   return (
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
