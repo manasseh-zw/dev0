@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 const priorities = [
   { id: "all", name: "All priorities", icon: Layers01Icon },
@@ -43,12 +44,22 @@ export function TaskFilters() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger>
-        <Button variant="secondary" size="sm" className="sm:gap-2">
-          <HugeiconsIcon icon={Settings01Icon} className="size-4" />
-          <span className="hidden sm:inline">Filter</span>
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={(props) => {
+          const { className, ...rest } = props;
+          return (
+            <Button
+              {...rest}
+              variant="secondary"
+              size="sm"
+              className={cn("sm:gap-2", className)}
+            >
+              <HugeiconsIcon icon={Settings01Icon} className="size-4" />
+              <span className="hidden sm:inline">Filter</span>
+            </Button>
+          );
+        }}
+      />
       <PopoverContent className="w-72 p-4" align="start">
         <div className="space-y-4">
           <div>

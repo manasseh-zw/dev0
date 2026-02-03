@@ -2,7 +2,7 @@ import * as React from 'react'
 
 export interface LogoProps extends React.SVGProps<SVGSVGElement> {
   /**
-   * Width of the logo. Defaults to "auto".
+   * Width of the logo. Leave undefined to size via CSS.
    */
   width?: string | number
   /**
@@ -15,7 +15,7 @@ export interface LogoProps extends React.SVGProps<SVGSVGElement> {
  * Dev0 Logo - Full logo with "dev0" text
  */
 export const Logo = React.forwardRef<SVGSVGElement, LogoProps>(
-  ({ width = 'auto', height = 40, className, ...props }, ref) => {
+  ({ width, height = 40, className, ...props }, ref) => {
     return (
       <svg
         ref={ref}

@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 const automationOptions = [
   {
@@ -48,15 +49,25 @@ export function TaskAutomate() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger>
-        <Button variant="secondary" size="sm" className="sm:gap-2">
-          <HugeiconsIcon icon={SparklesIcon} className="size-4" />
-          <span className="hidden sm:inline">Automate</span>
-          <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-            Pro
-          </span>
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={(props) => {
+          const { className, ...rest } = props;
+          return (
+            <Button
+              {...rest}
+              variant="secondary"
+              size="sm"
+              className={cn("sm:gap-2", className)}
+            >
+              <HugeiconsIcon icon={SparklesIcon} className="size-4" />
+              <span className="hidden sm:inline">Automate</span>
+              <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                Pro
+              </span>
+            </Button>
+          );
+        }}
+      />
       <PopoverContent className="w-80 p-4" align="start">
         <div className="space-y-4">
           <div>

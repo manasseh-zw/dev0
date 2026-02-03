@@ -31,11 +31,22 @@ export const Route = createFileRoute('/project/$projectId')({
 
 function ProjectLayout() {
   const { pathname } = useLocation()
-  const title = pathname.endsWith('/review')
-    ? 'Review'
-    : pathname.endsWith('/preview')
-      ? 'Preview'
-      : 'Dashboard'
+
+  // Determine the title based on the current route
+  const getTitle = () => {
+    if (pathname.includes('/review/')) {
+      return 'Review Details'
+    }
+    if (pathname.endsWith('/review')) {
+      return 'Review'
+    }
+    if (pathname.endsWith('/preview')) {
+      return 'Preview'
+    }
+    return 'Dashboard'
+  }
+
+  const title = getTitle()
 
   return (
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">

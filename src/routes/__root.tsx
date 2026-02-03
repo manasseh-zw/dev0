@@ -1,4 +1,10 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import {
+  HeadContent,
+  Scripts,
+  createRootRoute,
+  Link,
+  useRouterState,
+} from '@tanstack/react-router'
 
 import appCss from '@/styles.css?url'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -54,6 +60,7 @@ export const Route = createRootRoute({
   }),
 
   shellComponent: RootDocument,
+  notFoundComponent: NotFound,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -75,5 +82,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
+  )
+}
+
+function NotFound() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen gap-3 text-center px-6">
+      <p className="text-sm text-muted-foreground">Route not found</p>
+      <p className="text-sm text-muted-foreground">Path: {pathname}</p>
+      <Link to="/" className="text-sm text-primary hover:underline">
+        Go to home
+      </Link>
+    </div>
   )
 }

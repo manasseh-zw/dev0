@@ -1,7 +1,11 @@
 import type { ProjectWithTasks } from '@/lib/actions'
 import { mockProject } from './project'
-import { mockTasksWithBlocked, getMockTaskStats, getMockTasksByPhase, getMockTasksByStatus } from './tasks'
-
+import {
+  mockTasksWithBlocked,
+  getMockTaskStats,
+  getMockTasksByPhase,
+  getMockTasksByStatus,
+} from './tasks'
 
 export const MOCK_PROJECT_ID = 'mock'
 
@@ -30,6 +34,7 @@ export function getMockTasks() {
 
 export { getMockTaskStats, getMockTasksByPhase, getMockTasksByStatus }
 
-
 export { mockProject, mockTasksWithBlocked }
 export { MOCK_TASK_IDS } from './tasks'
+export { getMockPRDetails, hasMockPRDetails } from './pr-details'
+export { getMockExecutionLogs, hasMockExecutionLogs } from './execution-logs'
