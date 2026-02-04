@@ -47,8 +47,11 @@ export function MergeConfirmDialog({
 
       if (result.success) {
         onOpenChange(false)
-        // Refresh the page to show updated state
-        router.invalidate()
+        await router.invalidate()
+        router.navigate({
+          to: '/project/$projectId/review/$taskId',
+          params: { projectId, taskId },
+        })
       } else {
         setError(result.message)
       }

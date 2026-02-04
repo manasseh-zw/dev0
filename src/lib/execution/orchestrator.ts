@@ -199,14 +199,27 @@ export async function getNextRunnableTask(
 
   const statusById = new Map(allTasks.map((task) => [task.id, task.status]))
 
-  const runnable = allTasks.find((task) => {
+  const isComplete = (status: Task['status'] | undefined) =>
+    status === 'DONE' || status === 'SKIPPED'
+
+  const runnable = allTasks.find((task, index) => {
     if (task.status !== 'PENDING') {
       return false
     }
 
-    return task.dependencies.every(
-      (dependencyId) => statusById.get(dependencyId) === 'DONE',
+    const hasUnmetDependencies = !task.dependencies.every((dependencyId) =>
+      isComplete(statusById.get(dependencyId)),
     )
+
+    if (hasUnmetDependencies) {
+      return false
+    }
+
+    const hasPriorIncomplete = allTasks
+      .slice(0, index)
+      .some((prior) => !isComplete(prior.status))
+
+    return !hasPriorIncomplete
   })
 
   return runnable ?? null
@@ -691,13 +704,19 @@ ${taskInfo}${specBlock}
 
 Requirements:
 - Implement the task in the repo.
+- Only implement the single assigned task. Do not work on other tasks from TASKLIST.md or the broader project plan.
 - Follow any guidance in .dev0/RULES.md if present.
-- Update TASKLIST.md and LEARNINGS.md if they exist.
+- Update TASKLIST.md if it exists.
+- Update LEARNINGS.md only when you discover a reusable insight or non-obvious fix.
 - Keep changes scoped to the task and run relevant checks if needed.
+- Assume this is a sandboxed environment; environment variables or external services may be unavailable. Avoid making real network connections that require secrets. Ensure logic is correct and would work when env vars are provided.
 - Use bun for installs and scripts (bun install, bun run, etc.).
+- If you add new environment variables, document them in .env.example.
+- Do NOT run long-lived dev servers (bun run dev, npm run dev, etc.). Prefer bun run typecheck/tsc and bun run build when needed.
+- If this is a TanStack Start project, do not try to resolve route tree/type errors by running a dev server; note the issue in LEARNINGS.md and proceed.
 - Do NOT run git commit, git push, or gh pr create.
-- Write a JSON file at ${runDir}/agent-result.json with:
-  {"status":"success|failed","commitMessage":"...","prTitle":"...","prBody":"...","notes":"..."}
+ - Write a JSON file at ${runDir}/agent-result.json with:
+   {"status":"success|failed","commitMessage":"...","prTitle":"...","prBody":"...","notes":"..."}
 
 Finish by summarizing what you changed.`
 }

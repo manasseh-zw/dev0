@@ -220,6 +220,28 @@ async function main() {
       throw new Error(`bun install failed (exit ${installResult.exitCode})`)
     }
 
+    console.log('🧪 Installing a small dependency to observe output...')
+    const addDepResult = await runCommand(sandbox, 'bun add is-odd', {
+      cwd: WORKSPACE_DIR,
+      timeoutMs: 300000,
+    })
+    if (addDepResult.exitCode !== 0) {
+      throw new Error(`bun add failed (exit ${addDepResult.exitCode})`)
+    }
+
+    console.log('🧪 Starting dev server briefly to observe streaming...')
+    const devResult = await runCommand(
+      sandbox,
+      'set -m; bun run dev & DEV_PID=$!; sleep 20; kill $DEV_PID; wait $DEV_PID; exit 0',
+      {
+        cwd: WORKSPACE_DIR,
+        timeoutMs: 60000,
+      },
+    )
+    if (devResult.exitCode !== 0) {
+      console.warn(`⚠️  dev server command exited ${devResult.exitCode}`)
+    }
+
     const prompt = `${FEATURE_PROMPT}
 
 Repo: ${REPO_URL}

@@ -3,6 +3,7 @@
 import * as React from 'react'
 import type { ReviewPRFile } from '@/lib/types/review'
 import { cn } from '@/lib/utils'
+import { shouldIgnoreDiffFile } from '@/lib/review/ignore-files'
 import {
   ChevronRightIcon,
   FileIcon,
@@ -192,9 +193,13 @@ export function DiffFileTree({
   selectedFile,
   onFileSelect,
 }: DiffFileTreeProps) {
-  const tree = React.useMemo(() => buildFileTree(files), [files])
+  const visibleFiles = React.useMemo(
+    () => files.filter((file) => !shouldIgnoreDiffFile(file.filename)),
+    [files],
+  )
+  const tree = React.useMemo(() => buildFileTree(visibleFiles), [visibleFiles])
 
-  if (files.length === 0) {
+  if (visibleFiles.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground text-center">
         No files changed
@@ -205,7 +210,7 @@ export function DiffFileTree({
   return (
     <div className="h-full overflow-auto p-2">
       <div className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">
-        Changed files ({files.length})
+        Changed files ({visibleFiles.length})
       </div>
       {tree.map((node) => (
         <TreeNodeComponent

@@ -34,9 +34,6 @@ ${context}
 # Install dependencies
 bun install
 
-# Run development server
-bun run dev
-
 # Run tests
 bun test
 \`\`\`
@@ -225,6 +222,7 @@ function getFrameworkSpecificRules(techStack: TechStack): string {
 - **File-based Routing:** Routes go in \`src/routes/\`
 - **API Routes:** Server handlers in \`src/routes/api/\`
 - **Data Loading:** Use route loaders, not useEffect
+- **Route Tree Notes:** If you see route tree/type errors, do not run a dev server to resolve them. Note it in LEARNINGS.md and proceed; the route tree is generated when the dev server runs later.
 
 `,
     'react-vite': `
@@ -262,9 +260,9 @@ function getTaskCompletionRules(): string {
 Before creating a PR, ensure:
 
 1. ✅ **Tests Pass:** Run \`bun test\` and ensure all tests pass
-2. ✅ **Type Safety:** Run \`bun run typecheck\` with no errors
+2. ✅ **Type Safety:** Run \`bun run typecheck\` (or \`bun run tsc\`) with no errors
 3. ✅ **Code Quality:** Follow all style guidelines above
-4. ✅ **Update LEARNINGS.md:** Add any insights or gotchas you discovered
+4. ✅ **Update LEARNINGS.md:** Add any reusable insight or non-obvious fix you discovered
 5. ✅ **Commit Message:** Write clear, descriptive commit messages
 
 ---
@@ -272,7 +270,7 @@ Before creating a PR, ensure:
 ## Important Notes
 
 - 🚨 **Always run tests before creating a PR**
-- 📝 **Update LEARNINGS.md with any gotchas or important discoveries**
+- 📝 **Update LEARNINGS.md only when you discover a reusable insight or non-obvious fix**
 - 🧩 **Keep components small and focused (single responsibility)**
 - 🔒 **Never commit secrets or API keys**
 - 📚 **Reference LEARNINGS.md for past solutions to common issues**

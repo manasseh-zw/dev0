@@ -220,22 +220,44 @@ export type ProjectWithCount = Project & { _count: { tasks: number } }
 
 /**
  * Compute blocked status for a list of tasks.
- * A task is blocked if it's PENDING and has any dependency that is not DONE.
+ * A task is blocked if it's PENDING and has any dependency that is not complete
+ * or if any earlier task (by phase/order) is not complete.
  */
-function computeBlockedStatus<T extends Task>(tasks: T[]): (T & { isBlocked: boolean })[] {
+function computeBlockedStatus<T extends Task>(
+  tasks: T[],
+): (T & { isBlocked: boolean })[] {
   const statusMap = new Map(tasks.map((t) => [t.id, t.status]))
+  const isComplete = (status: Task['status']) =>
+    status === 'DONE' || status === 'SKIPPED'
+
+  const ordered = [...tasks].sort((a, b) => {
+    if (a.phase !== b.phase) return a.phase - b.phase
+    return (a.order ?? 0) - (b.order ?? 0)
+  })
+
+  let hasIncompleteBefore = false
+  const sequentialBlockedById = new Map<string, boolean>()
+  for (const task of ordered) {
+    sequentialBlockedById.set(task.id, hasIncompleteBefore)
+    if (!isComplete(task.status)) {
+      hasIncompleteBefore = true
+    }
+  }
 
   return tasks.map((task) => {
     const hasUnmetDependencies =
       task.dependencies.length > 0 &&
       task.dependencies.some((depId) => {
         const depStatus = statusMap.get(depId)
-        return !depStatus || depStatus !== 'DONE'
+        return !depStatus || !isComplete(depStatus)
       })
+    const hasPriorIncomplete = sequentialBlockedById.get(task.id) ?? false
 
     return {
       ...task,
-      isBlocked: task.status === 'PENDING' && hasUnmetDependencies,
+      isBlocked:
+        task.status === 'PENDING' &&
+        (hasUnmetDependencies || hasPriorIncomplete),
     }
   })
 }

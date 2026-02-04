@@ -429,18 +429,37 @@ export const mockTasks: Task[] = rawTasks.map((task) => ({
  */
 function computeMockBlockedStatus(tasks: Task[]): TaskWithBlocked[] {
   const statusMap = new Map(tasks.map((t) => [t.id, t.status]))
+  const isComplete = (status: Task['status']) =>
+    status === 'DONE' || status === 'SKIPPED'
+
+  const ordered = [...tasks].sort((a, b) => {
+    if (a.phase !== b.phase) return a.phase - b.phase
+    return (a.order ?? 0) - (b.order ?? 0)
+  })
+
+  let hasIncompleteBefore = false
+  const sequentialBlockedById = new Map<string, boolean>()
+  for (const task of ordered) {
+    sequentialBlockedById.set(task.id, hasIncompleteBefore)
+    if (!isComplete(task.status)) {
+      hasIncompleteBefore = true
+    }
+  }
 
   return tasks.map((task) => {
     const hasUnmetDependencies =
       task.dependencies.length > 0 &&
       task.dependencies.some((depId) => {
         const depStatus = statusMap.get(depId)
-        return !depStatus || depStatus !== 'DONE'
+        return !depStatus || !isComplete(depStatus)
       })
+    const hasPriorIncomplete = sequentialBlockedById.get(task.id) ?? false
 
     return {
       ...task,
-      isBlocked: task.status === 'PENDING' && hasUnmetDependencies,
+      isBlocked:
+        task.status === 'PENDING' &&
+        (hasUnmetDependencies || hasPriorIncomplete),
     }
   })
 }
@@ -449,7 +468,8 @@ function computeMockBlockedStatus(tasks: Task[]): TaskWithBlocked[] {
  * Mock tasks with isBlocked pre-computed.
  * Use this for UI components that expect TaskWithBlocked[].
  */
-export const mockTasksWithBlocked: TaskWithBlocked[] = computeMockBlockedStatus(mockTasks)
+export const mockTasksWithBlocked: TaskWithBlocked[] =
+  computeMockBlockedStatus(mockTasks)
 
 /**
  * Get task counts by status for statistics

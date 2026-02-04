@@ -6,6 +6,7 @@ import { DiffFileHeader } from './diff-file-header'
 import type { DiffViewMode } from './diff-viewer'
 import { useTheme } from 'next-themes'
 import { PatchDiff } from '@pierre/diffs/react'
+import { shouldIgnoreDiffFile } from '@/lib/review/ignore-files'
 
 function buildFilePatch(file: ReviewPRFile) {
   if (!file.patch) return null
@@ -39,7 +40,12 @@ export function DiffContent({
   const themeType = resolvedTheme === 'dark' ? 'dark' : 'light'
   const themeName = resolvedTheme === 'dark' ? 'github-dark' : 'github-light'
 
-  if (files.length === 0) {
+  const visibleFiles = React.useMemo(
+    () => files.filter((file) => !shouldIgnoreDiffFile(file.filename)),
+    [files],
+  )
+
+  if (visibleFiles.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center text-muted-foreground">
@@ -52,7 +58,7 @@ export function DiffContent({
 
   return (
     <div className="divide-y divide-border">
-      {files.map((file) => {
+      {visibleFiles.map((file) => {
         const isCollapsed = collapsedFiles.has(file.filename)
 
         return (

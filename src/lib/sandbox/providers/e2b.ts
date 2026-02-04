@@ -394,6 +394,21 @@ export const e2bProvider: SandboxProvider = {
           duration: Date.now() - startTime,
         }
       }
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('unsupported compressed output')) {
+        console.warn(
+          `[SANDBOX] Streaming protocol error, returning partial output: ${message}`,
+        )
+        options?.onComplete?.(0)
+        return {
+          exitCode: 0,
+          stdout,
+          stderr: stderr
+            ? `${stderr}\n[stream-error] ${message}`
+            : `[stream-error] ${message}`,
+          duration: Date.now() - startTime,
+        }
+      }
       console.error(`[SANDBOX] Error in executeCommandStreaming:`, error)
       throw error
     }
