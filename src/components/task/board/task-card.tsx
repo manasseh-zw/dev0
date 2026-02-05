@@ -1,6 +1,7 @@
 'use client'
 
 import type { Task } from '@/lib/types'
+import { Link } from '@tanstack/react-router'
 import type { Status } from '@/components/task/mock-data/statuses'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -18,10 +19,9 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { CircularProgressbar, buildStyles } from 'react-circular-progressbar'
-import 'react-circular-progressbar/dist/styles.css'
+import { cn } from '@/lib/utils'
 
 interface TaskCardProps {
   task: Task
@@ -63,12 +63,9 @@ export function TaskCard({
   const isCompleted = task.status === 'DONE'
   const isFailed = task.status === 'FAILED'
   const isPending = task.status === 'PENDING'
+  const isInReview = task.status === 'REVIEW'
   const isStartDisabled = isBlocked || isStarting
   const hasPr = Boolean(task.prUrl)
-  const hasAttempts = task.maxAttempts > 0
-  const attemptProgress = hasAttempts
-    ? (task.attempts / task.maxAttempts) * 100
-    : 0
   const modelValue = task.geminiModel ?? 'gemini-3-pro-preview'
   const currentModel =
     modelOptions.find((option) => option.id === modelValue) ?? modelOptions[0]
@@ -156,24 +153,6 @@ export function TaskCard({
                 <span>{task.prNumber ? `PR #${task.prNumber}` : 'PR'}</span>
               </div>
             )}
-            {!isPending && hasAttempts && (
-              <div className="flex items-center gap-1.5 border border-border rounded-sm py-1 px-2">
-                <div className="size-3">
-                  <CircularProgressbar
-                    value={attemptProgress}
-                    strokeWidth={12}
-                    styles={buildStyles({
-                      pathColor: 'var(--color-primary)',
-                      trailColor: 'var(--color-muted)',
-                      strokeLinecap: 'round',
-                    })}
-                  />
-                </div>
-                <span>
-                  {task.attempts}/{task.maxAttempts}
-                </span>
-              </div>
-            )}
           </div>
 
           {isPending && (
@@ -198,6 +177,19 @@ export function TaskCard({
                 </span>
               )}
             </Button>
+          )}
+          {isInReview && (
+            <Link
+              to="/project/$projectId/review/$taskId"
+              params={{ projectId: task.projectId, taskId: task.id }}
+              onClick={(event) => event.stopPropagation()}
+              className={cn(
+                buttonVariants({ size: 'sm' }),
+                'px-2 text-[10px] gap-1',
+              )}
+            >
+              Review
+            </Link>
           )}
         </div>
       </div>

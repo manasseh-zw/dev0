@@ -33,6 +33,7 @@ const GEMINI_OUTPUT = process.env.GEMINI_OUTPUT ?? 'stream-json'
 const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
 const DEV0_PROJECT_ID = process.env.DEV0_PROJECT_ID
 const DEV0_TASK_ID = process.env.DEV0_TASK_ID
+const SANDBOX_TEST_MODE = process.env.SANDBOX_TEST_MODE ?? ''
 
 const REPO_URL =
   process.env.TEST_REPO_URL ??
@@ -220,29 +221,51 @@ async function main() {
       throw new Error(`bun install failed (exit ${installResult.exitCode})`)
     }
 
-    console.log('🧪 Installing a small dependency to observe output...')
-    const addDepResult = await runCommand(sandbox, 'bun add is-odd', {
-      cwd: WORKSPACE_DIR,
-      timeoutMs: 300000,
-    })
-    if (addDepResult.exitCode !== 0) {
-      throw new Error(`bun add failed (exit ${addDepResult.exitCode})`)
+    if (SANDBOX_TEST_MODE !== 'gemini-dialog') {
+      console.log('🧪 Adding shadcn components to observe output...')
+      const shadcnResult = await runCommand(
+        sandbox,
+        'bunx --bun shadcn@latest add dialog --yes --overwrite',
+        {
+          cwd: WORKSPACE_DIR,
+          timeoutMs: 300000,
+        },
+      )
+      if (shadcnResult.exitCode !== 0) {
+        throw new Error(`shadcn add failed (exit ${shadcnResult.exitCode})`)
+      }
     }
 
-    console.log('🧪 Starting dev server briefly to observe streaming...')
-    const devResult = await runCommand(
-      sandbox,
-      'set -m; bun run dev & DEV_PID=$!; sleep 20; kill $DEV_PID; wait $DEV_PID; exit 0',
-      {
-        cwd: WORKSPACE_DIR,
-        timeoutMs: 60000,
-      },
-    )
-    if (devResult.exitCode !== 0) {
-      console.warn(`⚠️  dev server command exited ${devResult.exitCode}`)
+    if (SANDBOX_TEST_MODE === 'shadcn') {
+      console.log('🧪 Sandbox test mode set to shadcn; stopping early.')
+      return
     }
 
-    const prompt = `${FEATURE_PROMPT}
+    if (SANDBOX_TEST_MODE !== 'gemini-dialog') {
+      console.log('🧪 Starting dev server briefly to observe streaming...')
+      const devResult = await runCommand(
+        sandbox,
+        'set -m; bun run dev & DEV_PID=$!; sleep 20; kill $DEV_PID; wait $DEV_PID; exit 0',
+        {
+          cwd: WORKSPACE_DIR,
+          timeoutMs: 60000,
+        },
+      )
+      if (devResult.exitCode !== 0) {
+        console.warn(`⚠️  dev server command exited ${devResult.exitCode}`)
+      }
+    }
+
+    const diagnosticPrompt = `🔎 Diagnostic: shadcn dialog add
+Run the following command from the repo root EXACTLY as written (no extra args, paths, or prefixes):
+- bunx --bun shadcn@latest add dialog --yes --overwrite
+Then summarize the command output. Do not run any other commands.
+If the command fails, report the full error output and exit.
+Write a JSON file at ${RUN_DIR}/agent-result.json with:
+  {"status":"success|failed","commitMessage":"...","prTitle":"...","prBody":"...","notes":"..."}
+`
+
+    const prompt = `${SANDBOX_TEST_MODE === 'gemini-dialog' ? diagnosticPrompt : FEATURE_PROMPT}
 
 Repo: ${REPO_URL}
 
@@ -261,13 +284,15 @@ Please:
       `--model ${GEMINI_MODEL}`,
       GEMINI_DEBUG ? '--debug' : '',
       GEMINI_FLAGS ?? '',
-      GEMINI_OUTPUT === 'stream-json' ? '--output-format stream-json' : '',
+      GEMINI_OUTPUT === 'stream-json' || SANDBOX_TEST_MODE === 'gemini-dialog'
+        ? '--output-format stream-json'
+        : '',
       `-p "${escapeForDoubleQuotes(prompt)}"`,
     ]
 
     const geminiCmd = buildGeminiCommand(geminiArgs)
     const logsPath = `${WORKSPACE_DIR}/${RUN_DIR}/logs.jsonl`
-    const geminiWithLogs = `set -o pipefail && ${geminiCmd} | tee "${logsPath}"`
+    const geminiWithLogs = `set -o pipefail && ${geminiCmd} 2>&1 | tee "${logsPath}"`
 
     const result = await runCommand(sandbox, geminiWithLogs, {
       cwd: WORKSPACE_DIR,
@@ -275,7 +300,22 @@ Please:
     })
 
     if (result.exitCode !== 0) {
-      throw new Error(`Gemini CLI failed (exit ${result.exitCode})`)
+      if (SANDBOX_TEST_MODE === 'gemini-dialog') {
+        console.error(`Gemini CLI failed (exit ${result.exitCode})`)
+      } else {
+        throw new Error(`Gemini CLI failed (exit ${result.exitCode})`)
+      }
+    }
+
+    if (SANDBOX_TEST_MODE === 'gemini-dialog') {
+      const logsResult = await runCommand(sandbox, `cat "${logsPath}"`, {
+        cwd: WORKSPACE_DIR,
+        stream: false,
+      })
+      if (logsResult.exitCode === 0) {
+        console.log(logsResult.stdout)
+      }
+      return
     }
 
     const resultPath = `${WORKSPACE_DIR}/${RUN_DIR}/result.json`

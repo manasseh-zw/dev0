@@ -12,8 +12,6 @@ import {
   ArrowRight01Icon,
 } from '@hugeicons/core-free-icons'
 import { Badge } from '@/components/ui/badge'
-import { CircularProgressbar, buildStyles } from 'react-circular-progressbar'
-import 'react-circular-progressbar/dist/styles.css'
 
 interface TaskInfoProps {
   task: Task
@@ -33,11 +31,9 @@ const modelLabels: Record<string, { label: string; dotClassName: string }> = {
 
 export function TaskInfo({ task, status }: TaskInfoProps) {
   const StatusIcon = status.icon
-  const model = modelLabels[task.geminiModel ?? 'gemini-3-pro-preview'] ?? modelLabels['gemini-3-pro-preview']
-  const hasAttempts = task.maxAttempts > 0
-  const attemptProgress = hasAttempts
-    ? (task.attempts / task.maxAttempts) * 100
-    : 0
+  const model =
+    modelLabels[task.geminiModel ?? 'gemini-3-pro-preview'] ??
+    modelLabels['gemini-3-pro-preview']
 
   return (
     <div className="space-y-7">
@@ -72,7 +68,10 @@ export function TaskInfo({ task, status }: TaskInfoProps) {
             Model
           </h4>
           <div className="flex items-center gap-2 text-sm">
-            <HugeiconsIcon icon={CpuIcon} className="size-4 text-muted-foreground" />
+            <HugeiconsIcon
+              icon={CpuIcon}
+              className="size-4 text-muted-foreground"
+            />
             <span className={`size-2 rounded-full ${model.dotClassName}`} />
             <span>{model.label}</span>
           </div>
@@ -86,27 +85,19 @@ export function TaskInfo({ task, status }: TaskInfoProps) {
             Phase
           </h4>
           <div className="flex items-center gap-2 text-sm">
-            <HugeiconsIcon icon={Calendar01Icon} className="size-4 text-muted-foreground" />
+            <HugeiconsIcon
+              icon={Calendar01Icon}
+              className="size-4 text-muted-foreground"
+            />
             <span>Phase {task.phase}</span>
           </div>
         </div>
-        {task.status !== 'PENDING' && hasAttempts && (
+        {task.status !== 'PENDING' && task.maxAttempts > 0 && (
           <div className="space-y-2">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Attempts
             </h4>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="size-5">
-                <CircularProgressbar
-                  value={attemptProgress}
-                  strokeWidth={12}
-                  styles={buildStyles({
-                    pathColor: task.status === 'FAILED' ? 'var(--color-destructive)' : 'var(--color-primary)',
-                    trailColor: 'var(--color-muted)',
-                    strokeLinecap: 'round',
-                  })}
-                />
-              </div>
+            <div className="flex items-center gap-2 text-sm">
               <span>
                 {task.attempts} / {task.maxAttempts}
               </span>
@@ -128,7 +119,10 @@ export function TaskInfo({ task, status }: TaskInfoProps) {
                 variant="secondary"
                 className="gap-1.5 text-xs font-mono max-w-full"
               >
-                <HugeiconsIcon icon={GitBranchIcon} className="size-3 shrink-0" />
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  className="size-3 shrink-0"
+                />
                 <span className="truncate">{depId}</span>
               </Badge>
             ))}
@@ -163,11 +157,15 @@ export function TaskInfo({ task, status }: TaskInfoProps) {
         <div className="space-y-1.5 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <HugeiconsIcon icon={Clock01Icon} className="size-4" />
-            <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+            <span>
+              Created: {new Date(task.createdAt).toLocaleDateString()}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <HugeiconsIcon icon={Clock01Icon} className="size-4" />
-            <span>Updated: {new Date(task.updatedAt).toLocaleDateString()}</span>
+            <span>
+              Updated: {new Date(task.updatedAt).toLocaleDateString()}
+            </span>
           </div>
         </div>
       </section>

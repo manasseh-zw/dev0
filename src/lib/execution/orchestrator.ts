@@ -13,6 +13,7 @@ import {
   isGeminiEvent,
   type GeminiStreamEvent,
 } from '@/lib/types/gemini-stream'
+import { createTaskLogger, globalLogger } from '@/lib/logging'
 
 type ProjectRunState = {
   runningTaskId: string | null
@@ -44,16 +45,18 @@ export async function startTask(
   projectId: string,
   taskId?: string,
 ): Promise<StartTaskResult> {
-  console.log(
-    `[ORCHESTRATOR] startTask called - projectId: ${projectId}, taskId: ${taskId ?? 'auto'}`,
-  )
+  globalLogger.info('orchestrator', 'startTask called', {
+    projectId,
+    taskId: taskId ?? 'auto',
+  })
 
   const currentState = projectState.get(projectId)
 
   if (currentState?.runningTaskId || currentState?.starting) {
-    console.log(
-      `[ORCHESTRATOR] Task already running for project ${projectId} - taskId: ${currentState?.runningTaskId}`,
-    )
+    globalLogger.info('orchestrator', 'Task already running', {
+      projectId,
+      runningTaskId: currentState?.runningTaskId,
+    })
     return {
       taskId: currentState?.runningTaskId ?? '',
       sandboxId: currentState?.sandboxId ?? '',
@@ -66,7 +69,9 @@ export async function startTask(
     sandboxId: null,
     starting: true,
   })
-  console.log(`[ORCHESTRATOR] Set project state to starting`)
+  globalLogger.debug('orchestrator', 'Set project state to starting', {
+    projectId,
+  })
 
   try {
     const claimResult = await claimTaskForExecution(projectId, taskId)
@@ -88,14 +93,20 @@ export async function startTask(
     let sandboxId = ''
 
     try {
-      console.log(
-        `[ORCHESTRATOR] Getting or creating sandbox for project ${projectId}, task ${task.id}`,
-      )
+      globalLogger.info('orchestrator', 'Getting or creating sandbox', {
+        projectId,
+        taskId: task.id,
+      })
       const sandbox = await getOrCreateProjectSandbox(projectId, task.id)
       sandboxId = sandbox.id
-      console.log(`[ORCHESTRATOR] Sandbox ready - sandboxId: ${sandboxId}`)
+      globalLogger.info('orchestrator', 'Sandbox ready', {
+        projectId,
+        taskId: task.id,
+        sandboxId,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sandbox error'
+      globalLogger.error('orchestrator', 'Failed to get/create sandbox', error)
       await handleTaskStartFailure(projectId, task.id, message)
       throw error
     }
@@ -106,9 +117,11 @@ export async function startTask(
       starting: false,
     })
 
-    console.log(
-      `[ORCHESTRATOR] Emitting task_started event for task ${task.id}`,
-    )
+    globalLogger.debug('orchestrator', 'Emitting task_started event', {
+      projectId,
+      taskId: task.id,
+      sandboxId,
+    })
     executionBus.emit({
       type: 'task_started',
       projectId,
@@ -116,7 +129,10 @@ export async function startTask(
       sandboxId,
     })
 
-    console.log(`[ORCHESTRATOR] Starting async task execution...`)
+    globalLogger.info('orchestrator', 'Starting async task execution', {
+      projectId,
+      taskId: task.id,
+    })
     void runTaskExecution(projectId, task, sandboxId)
 
     return {
@@ -141,9 +157,13 @@ export async function completeTask(
   taskId: string,
   result: CompletionResult,
 ): Promise<void> {
-  console.log(
-    `[ORCHESTRATOR] completeTask called - taskId: ${taskId}, success: ${result.success}, prUrl: ${result.prUrl ?? 'none'}`,
-  )
+  globalLogger.info('orchestrator', 'completeTask called', {
+    projectId,
+    taskId,
+    success: result.success,
+    prUrl: result.prUrl,
+    error: result.error,
+  })
 
   if (result.success) {
     await db
@@ -235,19 +255,29 @@ async function runTaskExecution(
   task: Task,
   sandboxId: string,
 ): Promise<void> {
-  console.log(`[ORCHESTRATOR] runTaskExecution started - task: ${task.title}`)
+  // Create task logger for this execution
+  const logger = createTaskLogger(task.id, projectId)
+  logger.logOrchestrator('Task execution started', {
+    taskId: task.id,
+    taskTitle: task.title,
+    projectId,
+    sandboxId,
+  })
 
   // Collect events for persistence
   const collectedEvents: GeminiStreamEvent[] = []
 
   try {
     const project = await getProjectById(projectId)
+    await syncRepoToDefaultBranch(sandboxId, logger)
     const runDir = `${WORKSPACE_DIR}/.dev0/runs/${task.id}`
     await executeCommand(sandboxId, `mkdir -p "${runDir}"`, {
       cwd: WORKSPACE_DIR,
     })
     const prompt = buildTaskPrompt(project, task, runDir)
-    console.log(`[ORCHESTRATOR] Built prompt, executing Gemini CLI...`)
+    logger.logOrchestrator('Built prompt, executing Gemini CLI', {
+      promptLength: prompt.length,
+    })
 
     let stdoutBuffer = ''
     const handleStdoutLine = (line: string) => {
@@ -257,7 +287,7 @@ async function runTaskExecution(
         const geminiEvent = isGeminiEvent(parsed) ? parsed : undefined
 
         if (geminiEvent) {
-          console.log(`[GEMINI] Event: ${geminiEvent.type}`)
+          logger.logEvent(geminiEvent)
           collectedEvents.push(geminiEvent)
         }
 
@@ -270,6 +300,7 @@ async function runTaskExecution(
           geminiEvent,
         })
       } catch {
+        logger.logStream('stdout', line)
         executionBus.emit({
           type: 'task_log',
           projectId,
@@ -298,7 +329,7 @@ async function runTaskExecution(
           }
         },
         onStderr: (chunk) => {
-          console.log(`[GEMINI] stderr: ${chunk.slice(0, 100)}`)
+          logger.logStream('stderr', chunk)
           executionBus.emit({
             type: 'task_log',
             projectId,
@@ -323,9 +354,11 @@ async function runTaskExecution(
     const agentResult = await readAgentResult(sandboxId, agentResultPath)
 
     const prUrl = extractPrUrl(`${result.stdout}\n${result.stderr}`)
-    console.log(
-      `[ORCHESTRATOR] Gemini CLI finished - exitCode: ${result.exitCode}, prUrl: ${prUrl ?? 'none'}`,
-    )
+    logger.logOrchestrator('Gemini CLI finished', {
+      exitCode: result.exitCode,
+      prUrl,
+      durationMs: result.duration,
+    })
 
     if (result.exitCode === 0) {
       const finalize = await finalizeTaskChanges(
@@ -333,9 +366,11 @@ async function runTaskExecution(
         task,
         project,
         agentResult,
+        logger,
       )
 
       if (finalize.error) {
+        logger.complete(result.duration, false, finalize.error)
         await completeTask(projectId, task.id, {
           success: false,
           error: finalize.error,
@@ -344,24 +379,23 @@ async function runTaskExecution(
         return
       }
 
-      console.log(`[ORCHESTRATOR] Task completed successfully`)
+      logger.complete(result.duration, true)
       await completeTask(projectId, task.id, {
         success: true,
         prUrl: finalize.prUrl ?? prUrl,
       })
     } else {
-      console.log(
-        `[ORCHESTRATOR] Task failed - stderr: ${result.stderr?.slice(0, 200)}`,
-      )
+      const errorMsg = result.stderr || 'Command exited with non-zero status'
+      logger.complete(result.duration, false, errorMsg)
       await completeTask(projectId, task.id, {
         success: false,
-        error: result.stderr || 'Command exited with non-zero status',
+        error: errorMsg,
         prUrl,
       })
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`[ORCHESTRATOR] Task execution error: ${message}`)
+    logger.error('orchestrator', 'Task execution error', error)
 
     // Persist any collected events even on error
     if (collectedEvents.length > 0) {
@@ -370,6 +404,7 @@ async function runTaskExecution(
       })
     }
 
+    logger.complete(logger.getElapsedMs(), false, message)
     await completeTask(projectId, task.id, {
       success: false,
       error: message,
@@ -412,31 +447,46 @@ async function finalizeTaskChanges(
     prTitle?: string
     prBody?: string
   } | null,
+  logger: ReturnType<typeof createTaskLogger>,
 ): Promise<{ prUrl?: string; error?: string }> {
+  logger.logOrchestrator('Starting finalizeTaskChanges', {
+    taskId: task.id,
+    repoUrl: project.repoUrl,
+    repoName: project.repoName,
+    hasAgentResult: !!agentResult,
+  })
+
   if (!project.repoUrl && !project.repoName) {
+    logger.error('finalizeTaskChanges', 'Missing project repository info')
     return { error: 'Missing project repository info' }
   }
 
   const remoteUrl = withGithubToken(project.repoUrl, project.repoName)
   if (!remoteUrl) {
-    console.log('[ORCHESTRATOR] finalizeTaskChanges: missing repository URL')
+    logger.error(
+      'finalizeTaskChanges',
+      'Failed to build authenticated remote URL',
+    )
     return { error: 'Missing repository URL' }
   }
 
-  const remoteResult = await executeCommand(
-    sandboxId,
-    `git remote set-url origin "${escapeShellDoubleQuotes(remoteUrl)}"`,
-    { cwd: WORKSPACE_DIR },
+  logger.logOrchestrator('Setting git remote with authentication', {
+    repoName: project.repoName,
+    hasToken: remoteUrl.includes('x-access-token'),
+  })
+
+  const remoteCommand = `git remote set-url origin "${escapeShellDoubleQuotes(remoteUrl)}"`
+  const remoteResult = await executeCommand(sandboxId, remoteCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'remote-set-url',
+    remoteCommand,
+    remoteResult,
+    remoteResult.exitCode === 0,
   )
+
   if (remoteResult.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: git remote set-url failed (exit ${remoteResult.exitCode})`,
-    )
-    if (remoteResult.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: git remote stderr: ${remoteResult.stderr.slice(0, 400)}`,
-      )
-    }
     return { error: 'Failed to set authenticated remote' }
   }
 
@@ -446,129 +496,191 @@ async function finalizeTaskChanges(
   const prTitle = agentResult?.prTitle?.trim() || `feat: ${task.title}`
   const prBody = agentResult?.prBody?.trim() || ''
 
-  const gitConfig = await executeCommand(
-    sandboxId,
-    'git config user.email "dev0-agent@users.noreply.github.com" && git config user.name "dev0-agent"',
-    { cwd: WORKSPACE_DIR },
+  logger.logOrchestrator('Git configuration', {
+    branchName,
+    commitMessageLength: commitMessage.length,
+    prTitleLength: prTitle.length,
+    prBodyLength: prBody.length,
+  })
+
+  const gitConfigCommand =
+    'git config user.email "dev0-agent@users.noreply.github.com" && git config user.name "dev0-agent"'
+  const gitConfig = await executeCommand(sandboxId, gitConfigCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'config',
+    gitConfigCommand,
+    gitConfig,
+    gitConfig.exitCode === 0,
   )
+
   if (gitConfig.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: git config failed (exit ${gitConfig.exitCode})`,
-    )
-    if (gitConfig.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: git config stderr: ${gitConfig.stderr.slice(0, 400)}`,
-      )
-    }
     return { error: 'Failed to configure git user' }
   }
 
-  const prepareBranch = await executeCommand(
-    sandboxId,
-    `git checkout -B "${branchName}"`,
-    { cwd: WORKSPACE_DIR },
+  const checkoutCommand = `git checkout -B "${branchName}"`
+  const prepareBranch = await executeCommand(sandboxId, checkoutCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'checkout',
+    checkoutCommand,
+    prepareBranch,
+    prepareBranch.exitCode === 0,
   )
+
   if (prepareBranch.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: git checkout failed (exit ${prepareBranch.exitCode})`,
-    )
-    if (prepareBranch.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: git checkout stderr: ${prepareBranch.stderr.slice(0, 400)}`,
-      )
-    }
     return { error: 'Failed to create branch' }
   }
 
-  const addResult = await executeCommand(sandboxId, 'git add -A', {
+  const fetchCommand = 'git fetch origin --prune'
+  const fetchResult = await executeCommand(sandboxId, fetchCommand, {
     cwd: WORKSPACE_DIR,
   })
-  if (addResult.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: git add failed (exit ${addResult.exitCode})`,
+  logger.logGitOperation(
+    'fetch',
+    fetchCommand,
+    fetchResult,
+    fetchResult.exitCode === 0,
+  )
+
+  if (fetchResult.exitCode === 0) {
+    const defaultBranchCommand =
+      'git symbolic-ref refs/remotes/origin/HEAD --short'
+    const defaultBranchResult = await executeCommand(
+      sandboxId,
+      defaultBranchCommand,
+      {
+        cwd: WORKSPACE_DIR,
+      },
     )
-    if (addResult.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: git add stderr: ${addResult.stderr.slice(0, 400)}`,
-      )
+    logger.logGitOperation(
+      'default-branch',
+      defaultBranchCommand,
+      defaultBranchResult,
+      defaultBranchResult.exitCode === 0,
+    )
+
+    if (defaultBranchResult.exitCode === 0) {
+      const defaultBranch = defaultBranchResult.stdout
+        .trim()
+        .replace(/^origin\//, '')
+      if (defaultBranch) {
+        const rebaseCommand = `git rebase "origin/${defaultBranch}"`
+        const rebaseResult = await executeCommand(sandboxId, rebaseCommand, {
+          cwd: WORKSPACE_DIR,
+        })
+        logger.logGitOperation(
+          'rebase',
+          rebaseCommand,
+          rebaseResult,
+          rebaseResult.exitCode === 0,
+        )
+
+        if (rebaseResult.exitCode !== 0) {
+          const abortCommand = 'git rebase --abort'
+          const abortResult = await executeCommand(sandboxId, abortCommand, {
+            cwd: WORKSPACE_DIR,
+          })
+          logger.logGitOperation(
+            'rebase-abort',
+            abortCommand,
+            abortResult,
+            abortResult.exitCode === 0,
+          )
+          logger.warn('finalizeTaskChanges', 'Rebase failed, continuing', {
+            branchName,
+            defaultBranch,
+          })
+        }
+      }
     }
+  }
+
+  const addCommand = 'git add -A'
+  const addResult = await executeCommand(sandboxId, addCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation('add', addCommand, addResult, addResult.exitCode === 0)
+
+  if (addResult.exitCode !== 0) {
     return { error: 'Failed to stage changes' }
   }
 
-  const diffResult = await executeCommand(
-    sandboxId,
-    'git diff --cached --quiet',
-    { cwd: WORKSPACE_DIR },
-  )
+  const diffCommand = 'git diff --cached --quiet'
+  const diffResult = await executeCommand(sandboxId, diffCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation('diff-cached', diffCommand, diffResult, true)
+
   if (diffResult.exitCode === 0) {
-    console.log('[ORCHESTRATOR] finalizeTaskChanges: no staged changes')
+    logger.warn('finalizeTaskChanges', 'No staged changes to commit')
     return { error: 'No changes to commit' }
   }
 
-  const commitResult = await executeCommand(
-    sandboxId,
-    `git -c core.compression=0 -c http.compression=0 -c http.version=HTTP/1.1 commit -m "${escapeShellDoubleQuotes(
-      commitMessage,
-    )}"`,
-    { cwd: WORKSPACE_DIR },
+  const commitCommand = `git -c core.compression=0 -c http.compression=0 -c http.version=HTTP/1.1 commit -m "${escapeShellDoubleQuotes(
+    commitMessage,
+  )}"`
+  const commitResult = await executeCommand(sandboxId, commitCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'commit',
+    commitCommand,
+    commitResult,
+    commitResult.exitCode === 0,
   )
+
   if (commitResult.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: git commit failed (exit ${commitResult.exitCode})`,
-    )
-    if (commitResult.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: git commit stderr: ${commitResult.stderr.slice(0, 400)}`,
-      )
-    }
     return { error: 'Git commit failed' }
   }
 
-  const pushResult = await executeCommand(
-    sandboxId,
-    `GIT_HTTP_VERSION=HTTP/1.1 git -c core.compression=0 -c http.compression=0 -c http.version=HTTP/1.1 push -u origin "${branchName}"`,
-    { cwd: WORKSPACE_DIR },
+  logger.logOrchestrator('Pushing branch to origin', { branchName })
+
+  const pushCommand = `GIT_HTTP_VERSION=HTTP/1.1 git -c core.compression=0 -c http.compression=0 -c http.version=HTTP/1.1 push -u origin "${branchName}"`
+  const pushResult = await executeCommand(sandboxId, pushCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'push',
+    pushCommand,
+    pushResult,
+    pushResult.exitCode === 0,
   )
+
   if (pushResult.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: git push failed (exit ${pushResult.exitCode})`,
-    )
-    if (pushResult.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: git push stderr: ${pushResult.stderr.slice(0, 400)}`,
-      )
-    }
     return { error: 'Git push failed' }
   }
 
-  const prResult = await executeCommand(
-    sandboxId,
-    `GODEBUG=http2client=0 GH_PAGER=cat GIT_HTTP_VERSION=HTTP/1.1 gh pr create --title "${escapeShellDoubleQuotes(
-      prTitle,
-    )}" --body "${escapeShellDoubleQuotes(prBody)}"`,
-    { cwd: WORKSPACE_DIR },
-  )
+  logger.logOrchestrator('Creating GitHub PR', {
+    prTitle,
+    prBodyLength: prBody.length,
+  })
+
+  const prCommand = `GODEBUG=http2client=0 GH_PAGER=cat GIT_HTTP_VERSION=HTTP/1.1 gh pr create --title "${escapeShellDoubleQuotes(
+    prTitle,
+  )}" --body "${escapeShellDoubleQuotes(prBody)}"`
+  const prResult = await executeCommand(sandboxId, prCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+
+  // Log PR creation separately since it uses 'gh' not git
+  logger.logOrchestrator('gh pr create result', {
+    command: prCommand,
+    exitCode: prResult.exitCode,
+    stdout: prResult.stdout || undefined,
+    stderr: prResult.stderr || undefined,
+    success: prResult.exitCode === 0,
+  })
+
   if (prResult.exitCode !== 0) {
-    console.log(
-      `[ORCHESTRATOR] finalizeTaskChanges: gh pr create failed (exit ${prResult.exitCode})`,
-    )
-    if (prResult.stdout) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: gh pr stdout: ${prResult.stdout.slice(0, 400)}`,
-      )
-    }
-    if (prResult.stderr) {
-      console.log(
-        `[ORCHESTRATOR] finalizeTaskChanges: gh pr stderr: ${prResult.stderr.slice(0, 400)}`,
-      )
-    }
     return { error: 'gh pr create failed' }
   }
 
   const prUrl = extractPrUrl(`${prResult.stdout}\n${prResult.stderr}`)
-  console.log(
-    `[ORCHESTRATOR] finalizeTaskChanges: pr created ${prUrl ?? 'unknown'}`,
-  )
+  logger.logOrchestrator('PR created successfully', { prUrl, branchName })
+
   return { prUrl }
 }
 
@@ -599,6 +711,71 @@ function withGithubToken(
 
 function escapeShellDoubleQuotes(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+async function syncRepoToDefaultBranch(
+  sandboxId: string,
+  logger: ReturnType<typeof createTaskLogger>,
+): Promise<void> {
+  const fetchCommand = 'git fetch origin --prune'
+  const fetchResult = await executeCommand(sandboxId, fetchCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'fetch',
+    fetchCommand,
+    fetchResult,
+    fetchResult.exitCode === 0,
+  )
+
+  if (fetchResult.exitCode !== 0) return
+
+  const defaultBranchCommand =
+    'git symbolic-ref refs/remotes/origin/HEAD --short'
+  const defaultBranchResult = await executeCommand(
+    sandboxId,
+    defaultBranchCommand,
+    {
+      cwd: WORKSPACE_DIR,
+    },
+  )
+  logger.logGitOperation(
+    'default-branch',
+    defaultBranchCommand,
+    defaultBranchResult,
+    defaultBranchResult.exitCode === 0,
+  )
+
+  if (defaultBranchResult.exitCode !== 0) return
+
+  const defaultBranch = defaultBranchResult.stdout
+    .trim()
+    .replace(/^origin\//, '')
+  if (!defaultBranch) return
+
+  const checkoutCommand = `git checkout "${defaultBranch}"`
+  const checkoutResult = await executeCommand(sandboxId, checkoutCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'checkout-base',
+    checkoutCommand,
+    checkoutResult,
+    checkoutResult.exitCode === 0,
+  )
+
+  if (checkoutResult.exitCode !== 0) return
+
+  const pullCommand = `git pull --ff-only origin "${defaultBranch}"`
+  const pullResult = await executeCommand(sandboxId, pullCommand, {
+    cwd: WORKSPACE_DIR,
+  })
+  logger.logGitOperation(
+    'pull',
+    pullCommand,
+    pullResult,
+    pullResult.exitCode === 0,
+  )
 }
 
 /**
@@ -651,11 +828,13 @@ async function persistTaskLogs(
           updatedAt: new Date(),
         },
       })
-    console.log(
-      `[ORCHESTRATOR] Persisted ${events.length} events for task ${taskId}`,
+    globalLogger.info(
+      'orchestrator',
+      `Persisted ${events.length} events for task ${taskId}`,
+      { taskId, eventCount: events.length },
     )
   } catch (error) {
-    console.error(`[ORCHESTRATOR] Failed to persist task logs: ${error}`)
+    globalLogger.error('orchestrator', 'Failed to persist task logs', error)
   }
 }
 
@@ -709,11 +888,19 @@ Requirements:
 - Update TASKLIST.md if it exists.
 - Update LEARNINGS.md only when you discover a reusable insight or non-obvious fix.
 - Keep changes scoped to the task and run relevant checks if needed.
-- Assume this is a sandboxed environment; environment variables or external services may be unavailable. Avoid making real network connections that require secrets. Ensure logic is correct and would work when env vars are provided.
+- Assume this is a sandboxed environment; environment variables or external services are NOT configured. The database does NOT exist. NEVER make real network connections or run commands that require external services.
 - Use bun for installs and scripts (bun install, bun run, etc.).
 - If you add new environment variables, document them in .env.example.
-- Do NOT run long-lived dev servers (bun run dev, npm run dev, etc.). Prefer bun run typecheck/tsc and bun run build when needed.
-- If this is a TanStack Start project, do not try to resolve route tree/type errors by running a dev server; note the issue in LEARNINGS.md and proceed.
+- Do NOT run build commands (bun run build, npm run build, etc.) or dev servers (bun run dev, npm run dev, etc.) in the sandbox - these will hang indefinitely and cause the task to fail.
+- For type checking, ONLY run: bunx tsc --noEmit (do NOT use bun run typecheck or other build scripts)
+- Do NOT run eslint or use npx. Only run the allowed type check command above if validation is needed.
+- Do NOT run database migrations, drizzle-kit push, prisma migrate, or any database-related commands - the database is not configured in the sandbox.
+- Do NOT run any schema/code generation commands for the database (drizzle-kit generate, prisma generate, migrations, or similar) - we only validate code changes, not DB schema generation.
+- Do NOT run integration tests or any commands requiring external dependencies (databases, APIs, etc.) - only verify code logic is correct.
+- When you MUST run CLI commands that prompt for confirmation, use --force or --yes flags, but prefer not to run such commands at all.
+- Shadcn UI components are already present in src/components/ui across all templates. Do NOT run the shadcn CLI; import from the existing components.
+- Do NOT delete or modify .gemini temp/state directories (e.g., $HOME/.gemini/tmp). Never run rm -rf on .gemini paths.
+- If this is a TanStack Start project, do not try to resolve route tree/type errors by running a dev server or build command; note the issue in LEARNINGS.md and proceed.
 - Do NOT run git commit, git push, or gh pr create.
  - Write a JSON file at ${runDir}/agent-result.json with:
    {"status":"success|failed","commitMessage":"...","prTitle":"...","prBody":"...","notes":"..."}

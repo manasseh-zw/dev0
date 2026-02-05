@@ -18,6 +18,7 @@ import type {
 } from '@/lib/types'
 import { CommandExitError, Sandbox } from 'e2b'
 import { and, eq } from 'drizzle-orm'
+import { globalLogger } from '@/lib/logging'
 
 const DEFAULT_TEMPLATE = env.E2B_TEMPLATE
 const SANDBOX_HOME = '$HOME'
@@ -241,9 +242,10 @@ export const e2bProvider: SandboxProvider = {
     projectId: string,
     taskId?: string,
   ): Promise<SandboxInstance> {
-    console.log(
-      `[SANDBOX] getOrCreateProjectSandbox - projectId: ${projectId}, taskId: ${taskId ?? 'none'}`,
-    )
+    globalLogger.info('sandbox', 'getOrCreateProjectSandbox', {
+      projectId,
+      taskId: taskId ?? 'none',
+    })
 
     const existing = await db
       .select()
@@ -254,7 +256,11 @@ export const e2bProvider: SandboxProvider = {
       .limit(1)
 
     if (existing[0]) {
-      console.log(`[SANDBOX] Found existing sandbox: ${existing[0].id}`)
+      globalLogger.info('sandbox', 'Found existing sandbox', {
+        sandboxId: existing[0].id,
+        e2bSandboxId: existing[0].sandboxId,
+        taskId: existing[0].taskId,
+      })
       try {
         await connectSandbox(existing[0].sandboxId)
 
@@ -279,7 +285,7 @@ export const e2bProvider: SandboxProvider = {
       }
     }
 
-    console.log(`[SANDBOX] Creating new sandbox...`)
+    globalLogger.info('sandbox', 'Creating new sandbox', { projectId, taskId })
     const project = await getProjectRecord(projectId)
 
     return this.createSandbox({
@@ -299,11 +305,15 @@ export const e2bProvider: SandboxProvider = {
     const fullCommand = options?.cwd
       ? `cd ${options.cwd} && ${command}`
       : command
+    const wrappedCommand =
+      options?.wrapBash === false
+        ? fullCommand
+        : `bash -lc '${escapeForSingleQuotes(fullCommand)}'`
 
     const startTime = Date.now()
 
     try {
-      const response = await sandbox.commands.run(fullCommand, {
+      const response = await sandbox.commands.run(wrappedCommand, {
         timeoutMs: options?.timeout,
       })
 
@@ -347,22 +357,28 @@ export const e2bProvider: SandboxProvider = {
   ): Promise<CommandResult> {
     const dbSandbox = await getSandboxRecord(sandboxId)
 
-    console.log(
-      `[SANDBOX] executeCommandStreaming - getting sandbox ${dbSandbox.sandboxId}`,
-    )
+    globalLogger.debug('sandbox', 'executeCommandStreaming - connecting', {
+      sandboxId,
+      e2bSandboxId: dbSandbox.sandboxId,
+      hasCwd: !!options?.cwd,
+    })
     const sandbox = await connectSandbox(dbSandbox.sandboxId)
-    console.log(`[SANDBOX] Got sandbox, preparing command...`)
+    globalLogger.debug('sandbox', 'Connected to sandbox, preparing command')
 
     const fullCommand = options?.cwd
       ? `cd ${options.cwd} && ${command}`
       : command
+    const wrappedCommand =
+      options?.wrapBash === false
+        ? fullCommand
+        : `bash -lc '${escapeForSingleQuotes(fullCommand)}'`
     const startTime = Date.now()
 
     let stdout = ''
     let stderr = ''
 
     try {
-      const result = await sandbox.commands.run(fullCommand, {
+      const result = await sandbox.commands.run(wrappedCommand, {
         timeoutMs: options?.timeout ?? 600000,
         onStdout: (chunk) => {
           stdout += chunk
@@ -396,8 +412,14 @@ export const e2bProvider: SandboxProvider = {
       }
       const message = error instanceof Error ? error.message : String(error)
       if (message.includes('unsupported compressed output')) {
-        console.warn(
-          `[SANDBOX] Streaming protocol error, returning partial output: ${message}`,
+        globalLogger.warn(
+          'sandbox',
+          'Streaming protocol error, returning partial output',
+          {
+            error: message,
+            stdoutLength: stdout.length,
+            stderrLength: stderr.length,
+          },
         )
         options?.onComplete?.(0)
         return {
@@ -409,7 +431,7 @@ export const e2bProvider: SandboxProvider = {
           duration: Date.now() - startTime,
         }
       }
-      console.error(`[SANDBOX] Error in executeCommandStreaming:`, error)
+      globalLogger.error('sandbox', 'Error in executeCommandStreaming', error)
       throw error
     }
   },
@@ -442,6 +464,7 @@ export const e2bProvider: SandboxProvider = {
     return this.executeCommand(sandboxId, geminiCmd, {
       cwd,
       onOutput,
+      wrapBash: false,
     })
   },
 
@@ -458,9 +481,12 @@ export const e2bProvider: SandboxProvider = {
       onOutput,
     } = options
 
-    console.log(
-      `[SANDBOX] executeGeminiStreaming - model: ${model}, cwd: ${cwd ?? 'default'}, prompt length: ${prompt.length}`,
-    )
+    globalLogger.info('sandbox', 'executeGeminiStreaming', {
+      model,
+      cwd: cwd ?? 'default',
+      promptLength: prompt.length,
+      yolo,
+    })
 
     const geminiArgs = [
       yolo ? '--yolo' : '',
@@ -484,6 +510,7 @@ export const e2bProvider: SandboxProvider = {
       onStdout: callbacks?.onStdout,
       onStderr: callbacks?.onStderr,
       onComplete: callbacks?.onComplete,
+      wrapBash: false,
     })
   },
 

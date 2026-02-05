@@ -26,6 +26,13 @@ type PullRequestRef = {
   prNumber: number
 }
 
+type PullRequestContext = {
+  ref: PullRequestRef
+  baseRef: string
+  baseSha: string
+  headSha: string
+}
+
 function parsePullRequestUrl(prUrl: string): PullRequestRef | null {
   const match = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
   if (!match) return null
@@ -33,24 +40,40 @@ function parsePullRequestUrl(prUrl: string): PullRequestRef | null {
   return { owner, repoName, prNumber: Number(prNumber) }
 }
 
-function resolvePullRequestRef(
+async function resolvePullRequestContext(
   task: typeof tasks.$inferSelect,
   repoName: string | null,
-): PullRequestRef | null {
+): Promise<PullRequestContext | null> {
+  let ref: PullRequestRef | null = null
   if (task.prUrl) {
-    const parsed = parsePullRequestUrl(task.prUrl)
-    if (parsed) return parsed
+    ref = parsePullRequestUrl(task.prUrl)
   }
 
-  if (repoName && task.prNumber) {
-    return {
+  if (!ref && repoName && task.prNumber) {
+    ref = {
       owner: env.GITHUB_BOT_USERNAME,
       repoName,
       prNumber: task.prNumber,
     }
   }
 
-  return null
+  if (!ref) return null
+
+  const github = new GitHubProvider()
+  const prResponse = await github.getPullRequest({
+    owner: ref.owner,
+    repoName: ref.repoName,
+    prNumber: ref.prNumber,
+  })
+
+  const pr = prResponse.data
+  const baseRef = pr.base?.ref ?? 'master'
+  const baseSha = pr.base?.sha ?? ''
+  const headSha = pr.head?.sha ?? ''
+
+  if (!baseSha || !headSha) return null
+
+  return { ref, baseRef, baseSha, headSha }
 }
 
 function mapMockDetailsToSummary(
@@ -138,24 +161,24 @@ export const getReviewPRSummary = createServerFn({ method: 'GET' })
       throw new Error('Task not found')
     }
 
-    const repoRef = resolvePullRequestRef(
+    const prContext = await resolvePullRequestContext(
       row.task,
       row.project?.repoName ?? null,
     )
-    if (!repoRef) {
+    if (!prContext) {
       return null
     }
 
     const github = new GitHubProvider()
     const prResponse = await github.getPullRequest({
-      owner: repoRef.owner,
-      repoName: repoRef.repoName,
-      prNumber: repoRef.prNumber,
+      owner: prContext.ref.owner,
+      repoName: prContext.ref.repoName,
+      prNumber: prContext.ref.prNumber,
     })
     const commentsResponse = await github.listPullRequestComments({
-      owner: repoRef.owner,
-      repoName: repoRef.repoName,
-      prNumber: repoRef.prNumber,
+      owner: prContext.ref.owner,
+      repoName: prContext.ref.repoName,
+      prNumber: prContext.ref.prNumber,
     })
 
     const pr = prResponse.data
@@ -274,13 +297,13 @@ export const getReviewPRList = createServerFn({ method: 'GET' })
     }
 
     for (const task of tasksWithPrs) {
-      const prRef = resolvePullRequestRef(task, project.repoName)
-      if (!prRef) continue
+      const prContext = await resolvePullRequestContext(task, project.repoName)
+      if (!prContext) continue
 
       const prResponse = await github.getPullRequest({
-        owner: prRef.owner,
-        repoName: prRef.repoName,
-        prNumber: prRef.prNumber,
+        owner: prContext.ref.owner,
+        repoName: prContext.ref.repoName,
+        prNumber: prContext.ref.prNumber,
       })
       const pr = prResponse.data
 
@@ -334,31 +357,34 @@ export const getReviewPRFiles = createServerFn({ method: 'GET' })
       throw new Error('Task not found')
     }
 
-    const repoRef = resolvePullRequestRef(
+    const prContext = await resolvePullRequestContext(
       row.task,
       row.project?.repoName ?? null,
     )
-    if (!repoRef) {
+    if (!prContext) {
       return []
     }
 
     const github = new GitHubProvider()
-    const filesResponse = await github.listPullRequestFiles({
-      owner: repoRef.owner,
-      repoName: repoRef.repoName,
-      prNumber: repoRef.prNumber,
+    const compareResponse = await github.compareCommits({
+      owner: prContext.ref.owner,
+      repoName: prContext.ref.repoName,
+      base: prContext.baseSha,
+      head: prContext.headSha,
     })
 
-    return filesResponse.data.map((file) => ({
-      filename: file.filename,
-      status: file.status as ReviewPRFile['status'],
-      additions: file.additions,
-      deletions: file.deletions,
-      changes: file.changes,
-      sha: file.sha ?? '',
-      patch: file.patch ?? null,
-      previousFilename: file.previous_filename ?? null,
-    }))
+    return (
+      compareResponse.data.files?.map((file) => ({
+        filename: file.filename,
+        status: file.status as ReviewPRFile['status'],
+        additions: file.additions,
+        deletions: file.deletions,
+        changes: file.changes,
+        sha: file.sha ?? '',
+        patch: file.patch ?? null,
+        previousFilename: file.previous_filename ?? null,
+      })) ?? []
+    )
   })
 
 export const mergePullRequest = createServerFn({ method: 'POST' })
@@ -393,11 +419,11 @@ export const mergePullRequest = createServerFn({ method: 'POST' })
       throw new Error('Task not found')
     }
 
-    const repoRef = resolvePullRequestRef(
+    const prContext = await resolvePullRequestContext(
       row.task,
       row.project?.repoName ?? null,
     )
-    if (!repoRef) {
+    if (!prContext) {
       throw new Error('Pull request reference not found')
     }
 
@@ -405,8 +431,8 @@ export const mergePullRequest = createServerFn({ method: 'POST' })
 
     try {
       await github.mergePullRequest({
-        repoName: repoRef.repoName,
-        prNumber: repoRef.prNumber,
+        repoName: prContext.ref.repoName,
+        prNumber: prContext.ref.prNumber,
         mergeMethod: 'squash',
       })
 

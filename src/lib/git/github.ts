@@ -68,6 +68,13 @@ type ListPullRequestFilesOptions = {
   page?: number
 }
 
+type CompareCommitsOptions = {
+  owner?: string
+  repoName: string
+  base: string
+  head: string
+}
+
 type RepoInfo = {
   name: string
   fullName: string
@@ -81,7 +88,6 @@ type PullRequestInfo = {
   htmlUrl: string
   state: string
 }
-
 
 export class GitHubProvider {
   private octokit: Octokit
@@ -130,12 +136,12 @@ export class GitHubProvider {
     }
   }
 
- 
-  async createInitialFiles(
-    options: CreateInitialFilesOptions,
-  ): Promise<void> {
-    const { repoName, files, commitMessage = 'Initialize project files' } =
-      options
+  async createInitialFiles(options: CreateInitialFilesOptions): Promise<void> {
+    const {
+      repoName,
+      files,
+      commitMessage = 'Initialize project files',
+    } = options
 
     try {
       const { data: repo } = await this.octokit.rest.repos.get({
@@ -143,11 +149,9 @@ export class GitHubProvider {
         repo: repoName,
       })
 
-      const branchesToTry = [
-        repo.default_branch,
-        'master',
-        'main',
-      ].filter((b): b is string => Boolean(b))
+      const branchesToTry = [repo.default_branch, 'master', 'main'].filter(
+        (b): b is string => Boolean(b),
+      )
 
       let defaultBranch: string | undefined
       let baseSha: string | undefined
@@ -180,7 +184,6 @@ export class GitHubProvider {
       if (!defaultBranch) {
         defaultBranch = 'master'
       }
-
 
       // Create file tree items
       const treeItems = files.map((file) => ({
@@ -244,13 +247,7 @@ export class GitHubProvider {
   }
 
   async listPullRequests(options: ListPullRequestsOptions) {
-    const {
-      owner,
-      repoName,
-      state = 'all',
-      perPage = 100,
-      page = 1,
-    } = options
+    const { owner, repoName, state = 'all', perPage = 100, page = 1 } = options
     const resolvedOwner = this.resolveOwner(owner)
 
     return this.octokit.rest.pulls.list({
@@ -299,6 +296,17 @@ export class GitHubProvider {
       page,
     })
   }
+
+  async compareCommits(options: CompareCommitsOptions) {
+    const { owner, repoName, base, head } = options
+    const resolvedOwner = this.resolveOwner(owner)
+
+    return this.octokit.rest.repos.compareCommitsWithBasehead({
+      owner: resolvedOwner,
+      repo: repoName,
+      basehead: `${base}...${head}`,
+    })
+  }
   /**
    * Upload or update a single file in a repository
    */
@@ -309,13 +317,14 @@ export class GitHubProvider {
       let sha: string | undefined
 
       try {
-        const { data: existingFile } =
-          await this.octokit.rest.repos.getContent({
+        const { data: existingFile } = await this.octokit.rest.repos.getContent(
+          {
             owner: this.owner,
             repo: repoName,
             path,
             ref: branch,
-          })
+          },
+        )
 
         if ('sha' in existingFile) {
           sha = existingFile.sha

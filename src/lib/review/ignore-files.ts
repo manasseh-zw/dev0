@@ -1,6 +1,7 @@
-export const DEFAULT_DIFF_IGNORE_PREFIXES = ['.dev0/']
+export const DEFAULT_DIFF_IGNORE_PREFIXES = ['.dev0/', '.gemini/']
 
 export const DEFAULT_DIFF_IGNORE_EXACT = [
+  'bun.lock',
   'bun.lockb',
   'pnpm-lock.yaml',
   'package-lock.json',

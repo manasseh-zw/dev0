@@ -18,6 +18,7 @@ export type ExecuteCommandOptions = {
   cwd?: string
   timeout?: number
   onOutput?: (data: string) => void
+  wrapBash?: boolean
 }
 
 export type StreamingCallbacks = {

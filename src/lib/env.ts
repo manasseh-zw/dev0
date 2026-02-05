@@ -30,7 +30,9 @@ function optionalEnv(key: string, fallback: string): string {
  */
 export const env = {
   // Database
-  DATABASE_URL: requireEnv('DATABASE_URL'),
+  DATABASE_URL: optionalEnv('DATABASE_URL', ''),
+  DATABASE_PROVIDER: optionalEnv('DATABASE_PROVIDER', 'neon'),
+  SUPABASE_DATABASE_URL: optionalEnv('SUPABASE_DATABASE_URL', ''),
 
   // E2B
   E2B_API_KEY: requireEnv('E2B_API_KEY'),
