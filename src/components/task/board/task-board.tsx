@@ -4,7 +4,11 @@ import * as React from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { LayoutGroup } from 'motion/react'
 import type { TaskStatus, TaskWithBlocked } from '@/lib/types'
-import { updateTaskModel, startExecution } from '@/lib/actions'
+import {
+  updateTaskModel,
+  startExecution,
+  updateTaskStatus,
+} from '@/lib/actions'
 import { useExecutionEvents } from '@/lib/hooks/use-execution-events'
 import { statuses } from '@/components/task/mock-data/statuses'
 import { TaskColumn } from './task-column'
@@ -29,6 +33,9 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
     Record<string, TaskStatus>
   >({})
   const [startingTaskIds, setStartingTaskIds] = React.useState<
+    Record<string, boolean>
+  >({})
+  const [retryingTaskIds, setRetryingTaskIds] = React.useState<
     Record<string, boolean>
   >({})
 
@@ -73,7 +80,13 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
     setItems(
       tasks.map((task) => {
         const optimistic = optimisticStatuses[task.id]
-        if (optimistic && task.status === 'PENDING') {
+        if (optimistic === 'RUNNING' && task.status === 'PENDING') {
+          return {
+            ...task,
+            status: optimistic,
+          }
+        }
+        if (optimistic === 'PENDING' && task.status === 'FAILED') {
           return {
             ...task,
             status: optimistic,
@@ -86,7 +99,13 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
       let changed = false
       const next = { ...current }
       for (const task of tasks) {
-        if (next[task.id] && task.status !== 'PENDING') {
+        const optimistic = next[task.id]
+        if (!optimistic) continue
+        if (optimistic === 'RUNNING' && task.status !== 'PENDING') {
+          delete next[task.id]
+          changed = true
+        }
+        if (optimistic === 'PENDING' && task.status === 'PENDING') {
           delete next[task.id]
           changed = true
         }
@@ -201,6 +220,47 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
     [items],
   )
 
+  const handleRetryTask = React.useCallback(
+    async (taskId: string) => {
+      const task = items.find((t) => t.id === taskId)
+      if (!task || task.status !== 'FAILED') return
+
+      setRetryingTaskIds((current) => ({ ...current, [taskId]: true }))
+
+      if (task.projectId === 'mock') {
+        setItems((current) =>
+          current.map((t) =>
+            t.id === taskId ? { ...t, status: 'PENDING' as TaskStatus } : t,
+          ),
+        )
+        setRetryingTaskIds((current) => {
+          const next = { ...current }
+          delete next[taskId]
+          return next
+        })
+        return
+      }
+
+      try {
+        await updateTaskStatus({ data: { taskId, status: 'PENDING' } })
+        setOptimisticStatuses((current) => ({
+          ...current,
+          [taskId]: 'PENDING',
+        }))
+        router.invalidate()
+      } catch (error) {
+        console.error('Failed to retry task:', error)
+      } finally {
+        setRetryingTaskIds((current) => {
+          const next = { ...current }
+          delete next[taskId]
+          return next
+        })
+      }
+    },
+    [items, router],
+  )
+
   // Handle task card click to open sheet
   const handleTaskClick = React.useCallback((task: TaskWithBlocked) => {
     setSelectedTask(task)
@@ -217,8 +277,10 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
               status={status}
               tasks={tasksByStatus[status.id] || []}
               startingTaskIds={startingTaskIds}
+              retryingTaskIds={retryingTaskIds}
               onModelChange={handleModelChange}
               onStartTask={handleStartTask}
+              onRetryTask={handleRetryTask}
               onTaskClick={handleTaskClick}
             />
           ))}

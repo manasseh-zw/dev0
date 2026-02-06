@@ -1,17 +1,7 @@
 'use client'
 
-import type { Task } from '@/lib/types'
-import { Link } from '@tanstack/react-router'
 import type { Status } from '@/components/task/mock-data/statuses'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Calendar01Icon,
-  File01Icon,
-  CheckmarkCircle02Icon,
-  InformationCircleIcon,
-  PlayIcon,
-  SquareLock02Icon,
-} from '@hugeicons/core-free-icons'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +9,20 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Button, buttonVariants } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import type { Task } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import {
+  Calendar01Icon,
+  CheckmarkCircle02Icon,
+  File01Icon,
+  InformationCircleIcon,
+  PlayIcon,
+  Refresh01Icon,
+  SquareLock02Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Link } from '@tanstack/react-router'
 
 interface TaskCardProps {
   task: Task
@@ -29,11 +30,13 @@ interface TaskCardProps {
   /** Pre-computed blocked status - computed at board level for performance */
   isBlocked?: boolean
   isStarting?: boolean
+  isRetrying?: boolean
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
   ) => void
   onStartTask?: (taskId: string) => void
+  onRetryTask?: (taskId: string) => void
   onClick?: () => void
 }
 
@@ -55,8 +58,10 @@ export function TaskCard({
   status,
   isBlocked = false,
   isStarting = false,
+  isRetrying = false,
   onModelChange,
   onStartTask,
+  onRetryTask,
   onClick,
 }: TaskCardProps) {
   const StatusIcon = status.icon
@@ -190,6 +195,25 @@ export function TaskCard({
             >
               Review
             </Link>
+          )}
+          {isFailed && (
+            <Button
+              size="icon"
+              variant="outline"
+              className="size-7"
+              disabled={isRetrying || isStarting}
+              onClick={(event) => {
+                event.stopPropagation()
+                onRetryTask?.(task.id)
+              }}
+              aria-label="Retry task"
+            >
+              {isRetrying ? (
+                <Spinner className="size-3" />
+              ) : (
+                <HugeiconsIcon icon={Refresh01Icon} className="size-3.5" />
+              )}
+            </Button>
           )}
         </div>
       </div>

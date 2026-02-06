@@ -131,6 +131,38 @@ async function getProjectRecord(projectId: string) {
 
 export const e2bProvider: SandboxProvider = {
   async createSandbox(config: CreateSandboxConfig): Promise<SandboxInstance> {
+    if (config.taskId) {
+      const existingByTask = await db
+        .select()
+        .from(sandboxes)
+        .where(eq(sandboxes.taskId, config.taskId))
+        .limit(1)
+
+      if (existingByTask[0]) {
+        globalLogger.info('sandbox', 'Reusing existing task sandbox', {
+          sandboxId: existingByTask[0].id,
+          e2bSandboxId: existingByTask[0].sandboxId,
+          taskId: config.taskId,
+        })
+
+        try {
+          await connectSandbox(existingByTask[0].sandboxId)
+          return {
+            id: existingByTask[0].id,
+            sandboxId: existingByTask[0].sandboxId,
+            status:
+              existingByTask[0].status.toLowerCase() as SandboxInstance['status'],
+            publicUrl: existingByTask[0].publicUrl ?? undefined,
+          }
+        } catch (error) {
+          await db
+            .update(sandboxes)
+            .set({ status: 'STOPPED' })
+            .where(eq(sandboxes.id, existingByTask[0].id))
+        }
+      }
+    }
+
     const template = getTemplate(config.techStack)
     const project = await getProjectRecord(config.projectId)
     const projectCloneUrl = buildProjectCloneUrl(project)
@@ -215,16 +247,37 @@ export const e2bProvider: SandboxProvider = {
       )}' > ${PROJECT_DIR}/.gemini/settings.json`,
     )
 
-    const [dbSandbox] = await db
-      .insert(sandboxes)
-      .values({
-        sandboxId: sandbox.sandboxId,
-        projectId: config.projectId,
-        taskId: config.taskId ?? null,
-        status: 'READY',
-        snapshotId: DEFAULT_TEMPLATE,
-      })
-      .returning()
+    const existingByTask = config.taskId
+      ? await db
+          .select({ id: sandboxes.id })
+          .from(sandboxes)
+          .where(eq(sandboxes.taskId, config.taskId))
+          .limit(1)
+      : []
+
+    const [dbSandbox] = existingByTask[0]
+      ? await db
+          .update(sandboxes)
+          .set({
+            sandboxId: sandbox.sandboxId,
+            projectId: config.projectId,
+            taskId: config.taskId ?? null,
+            status: 'READY',
+            snapshotId: DEFAULT_TEMPLATE,
+            updatedAt: new Date(),
+          })
+          .where(eq(sandboxes.id, existingByTask[0].id))
+          .returning()
+      : await db
+          .insert(sandboxes)
+          .values({
+            sandboxId: sandbox.sandboxId,
+            projectId: config.projectId,
+            taskId: config.taskId ?? null,
+            status: 'READY',
+            snapshotId: DEFAULT_TEMPLATE,
+          })
+          .returning()
 
     if (!dbSandbox) {
       throw new Error('Failed to persist sandbox')
@@ -246,6 +299,39 @@ export const e2bProvider: SandboxProvider = {
       projectId,
       taskId: taskId ?? 'none',
     })
+
+    if (taskId) {
+      const existingByTask = await db
+        .select()
+        .from(sandboxes)
+        .where(eq(sandboxes.taskId, taskId))
+        .limit(1)
+
+      if (existingByTask[0]) {
+        globalLogger.info('sandbox', 'Found task sandbox', {
+          sandboxId: existingByTask[0].id,
+          e2bSandboxId: existingByTask[0].sandboxId,
+          status: existingByTask[0].status,
+          taskId,
+        })
+
+        try {
+          await connectSandbox(existingByTask[0].sandboxId)
+          return {
+            id: existingByTask[0].id,
+            sandboxId: existingByTask[0].sandboxId,
+            status:
+              existingByTask[0].status.toLowerCase() as SandboxInstance['status'],
+            publicUrl: existingByTask[0].publicUrl ?? undefined,
+          }
+        } catch (error) {
+          await db
+            .update(sandboxes)
+            .set({ status: 'STOPPED' })
+            .where(eq(sandboxes.id, existingByTask[0].id))
+        }
+      }
+    }
 
     const existing = await db
       .select()

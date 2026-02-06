@@ -12,11 +12,13 @@ interface TaskColumnProps {
   status: Status
   tasks: TaskWithBlocked[]
   startingTaskIds?: Record<string, boolean>
+  retryingTaskIds?: Record<string, boolean>
   onModelChange?: (
     taskId: string,
     model: 'gemini-3-flash-preview' | 'gemini-3-pro-preview',
   ) => void
   onStartTask?: (taskId: string) => void
+  onRetryTask?: (taskId: string) => void
   onTaskClick?: (task: TaskWithBlocked) => void
 }
 
@@ -24,8 +26,10 @@ export function TaskColumn({
   status,
   tasks,
   startingTaskIds = {},
+  retryingTaskIds = {},
   onModelChange,
   onStartTask,
+  onRetryTask,
   onTaskClick,
 }: TaskColumnProps) {
   const StatusIcon = status.icon
@@ -72,8 +76,10 @@ export function TaskColumn({
                   status={status}
                   isBlocked={task.isBlocked}
                   isStarting={Boolean(startingTaskIds[task.id])}
+                  isRetrying={Boolean(retryingTaskIds[task.id])}
                   onModelChange={onModelChange}
                   onStartTask={onStartTask}
+                  onRetryTask={onRetryTask}
                   onClick={() => onTaskClick?.(task)}
                 />
               </motion.div>
