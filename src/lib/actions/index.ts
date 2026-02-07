@@ -17,6 +17,15 @@ export {
 // Preview Action
 export { getPreview, type PreviewOutput } from './preview'
 
+// Project Preview Actions
+export {
+  startProjectPreview,
+  getProjectFileTree,
+  getProjectFileContent,
+  getProjectFileContents,
+  type FileTreeNode,
+} from './project-preview'
+
 // Transcription Action
 export { transcribe } from './transcribe'
 

@@ -5,7 +5,10 @@ import {
   getE2bConnectionOpts,
   getE2bSandboxTimeoutMs,
 } from '@/lib/sandbox/client'
-import type { SandboxProvider } from '@/lib/sandbox/provider-interface'
+import type {
+  SandboxFileEntry,
+  SandboxProvider,
+} from '@/lib/sandbox/provider-interface'
 import { getTemplate } from '@/lib/templates'
 import type {
   CommandResult,
@@ -23,6 +26,7 @@ import { globalLogger } from '@/lib/logging'
 const DEFAULT_TEMPLATE = env.E2B_TEMPLATE
 const SANDBOX_HOME = '$HOME'
 const PROJECT_DIR = `${SANDBOX_HOME}/project`
+const PROJECT_ABS_DIR = '/home/user/project'
 
 function escapeForDoubleQuotes(value: string): string {
   return value
@@ -99,6 +103,21 @@ async function connectSandbox(sandboxId: string) {
     ...getE2bConnectionOpts(),
     timeoutMs: getE2bSandboxTimeoutMs(),
   })
+}
+
+function toFileEntry(entry: {
+  name: string
+  path: string
+  type?: string
+  size?: number
+}): SandboxFileEntry {
+  const type = entry.type === 'dir' ? 'dir' : 'file'
+  return {
+    name: entry.name,
+    path: entry.path,
+    type,
+    size: entry.size,
+  }
 }
 
 async function getSandboxRecord(sandboxId: string) {
@@ -598,6 +617,50 @@ export const e2bProvider: SandboxProvider = {
       onComplete: callbacks?.onComplete,
       wrapBash: false,
     })
+  },
+
+  async startDevServer(sandboxId: string, command: string): Promise<void> {
+    const dbSandbox = await getSandboxRecord(sandboxId)
+    const sandbox = await connectSandbox(dbSandbox.sandboxId)
+    await sandbox.commands.run(
+      'bash -lc "test -d node_modules || bun install"',
+      {
+        cwd: PROJECT_ABS_DIR,
+      },
+    )
+    await sandbox.commands.run(command, {
+      background: true,
+      cwd: PROJECT_ABS_DIR,
+      envs: {
+        PORT: '3000',
+        HOST: '0.0.0.0',
+      },
+    })
+  },
+
+  async getPreviewUrl(sandboxId: string, port: number): Promise<string> {
+    const dbSandbox = await getSandboxRecord(sandboxId)
+    const sandbox = await connectSandbox(dbSandbox.sandboxId)
+    return `https://${sandbox.getHost(port)}`
+  },
+
+  async listFiles(
+    sandboxId: string,
+    rootPath: string,
+    options?: { depth?: number },
+  ): Promise<SandboxFileEntry[]> {
+    const dbSandbox = await getSandboxRecord(sandboxId)
+    const sandbox = await connectSandbox(dbSandbox.sandboxId)
+    const entries = await sandbox.files.list(rootPath, {
+      depth: options?.depth,
+    })
+    return entries.map(toFileEntry)
+  },
+
+  async readFile(sandboxId: string, path: string): Promise<string> {
+    const dbSandbox = await getSandboxRecord(sandboxId)
+    const sandbox = await connectSandbox(dbSandbox.sandboxId)
+    return sandbox.files.read(path)
   },
 
   async stopSandbox(sandboxId: string): Promise<void> {

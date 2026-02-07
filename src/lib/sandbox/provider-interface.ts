@@ -8,6 +8,15 @@ import type {
   StreamingCommandOptions,
 } from '@/lib/types'
 
+export type SandboxFileType = 'file' | 'dir'
+
+export type SandboxFileEntry = {
+  name: string
+  path: string
+  type: SandboxFileType
+  size?: number
+}
+
 export type SandboxProvider = {
   createSandbox(config: CreateSandboxConfig): Promise<SandboxInstance>
   getOrCreateProjectSandbox(
@@ -33,6 +42,14 @@ export type SandboxProvider = {
     options: GeminiExecOptions,
     callbacks?: StreamingCallbacks,
   ): Promise<CommandResult>
+  startDevServer(sandboxId: string, command: string): Promise<void>
+  getPreviewUrl(sandboxId: string, port: number): Promise<string>
+  listFiles(
+    sandboxId: string,
+    rootPath: string,
+    options?: { depth?: number },
+  ): Promise<SandboxFileEntry[]>
+  readFile(sandboxId: string, path: string): Promise<string>
   stopSandbox(sandboxId: string): Promise<void>
   deleteSandbox(sandboxId: string): Promise<void>
   getSandbox(sandboxId: string): Promise<SandboxInstance>

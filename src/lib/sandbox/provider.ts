@@ -7,6 +7,7 @@ import type {
   StreamingCallbacks,
   StreamingCommandOptions,
 } from '@/lib/types'
+import type { SandboxFileEntry } from '@/lib/sandbox/provider-interface'
 import { getSandboxProvider } from '@/lib/sandbox/providers'
 
 const provider = getSandboxProvider()
@@ -53,6 +54,35 @@ export async function executeGeminiStreaming(
   callbacks?: StreamingCallbacks,
 ): Promise<CommandResult> {
   return provider.executeGeminiStreaming(sandboxId, options, callbacks)
+}
+
+export async function startDevServer(
+  sandboxId: string,
+  command: string,
+): Promise<void> {
+  return provider.startDevServer(sandboxId, command)
+}
+
+export async function getPreviewUrl(
+  sandboxId: string,
+  port: number,
+): Promise<string> {
+  return provider.getPreviewUrl(sandboxId, port)
+}
+
+export async function listFiles(
+  sandboxId: string,
+  rootPath: string,
+  options?: { depth?: number },
+): Promise<SandboxFileEntry[]> {
+  return provider.listFiles(sandboxId, rootPath, options)
+}
+
+export async function readFile(
+  sandboxId: string,
+  path: string,
+): Promise<string> {
+  return provider.readFile(sandboxId, path)
 }
 
 export async function stopSandbox(sandboxId: string): Promise<void> {

@@ -1,178 +1,312 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  FileTree,
-  FileTreeFolder,
-  FileTreeFile,
-} from '@/components/ai-elements/file-tree'
+import { useEffect, useMemo, useState } from 'react'
+import { FileTree } from '@/components/ui/file-tree'
 import {
   CodeBlock,
-  CodeBlockHeader,
-  CodeBlockTitle,
-  CodeBlockFilename,
-  CodeBlockActions,
+  CodeBlockBody,
+  CodeBlockContent,
   CodeBlockCopyButton,
-} from '@/components/ai-elements/code-block'
-import { FileIcon } from 'lucide-react'
+  CodeBlockFilename,
+  CodeBlockHeader,
+  CodeBlockItem,
+} from '@/components/ui/code-block'
 import type { BundledLanguage } from 'shiki'
+import type { FileTreeNode } from '@/lib/actions'
+import { cn } from '@/lib/utils'
 
-// Mock file data for initial UI - will be replaced with sandbox API later
-const MOCK_FILES: Record<string, { content: string; language: BundledLanguage }> = {
-  'src/App.tsx': {
-    content: `import { useState } from 'react'
-import './App.css'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div className="App">
-      <h1>Hello World</h1>
-      <button onClick={() => setCount(c => c + 1)}>
-        Count: {count}
-      </button>
-    </div>
-  )
+type FileContent = {
+  content: string
+  truncated: boolean
 }
 
-export default App`,
-    language: 'tsx',
-  },
-  'src/index.css': {
-    content: `:root {
-  font-family: Inter, system-ui, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+type CodeViewProps = {
+  fileTree: FileTreeNode[]
+  onReadFile: (path: string) => Promise<FileContent>
+  onReadFiles?: (paths: string[]) => Promise<
+    | {
+        files: Record<string, string>
+        truncated: Record<string, boolean>
+      }
+    | undefined
+  >
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
+const DEFAULT_FILE = 'README.md'
+
+const LANGUAGE_BY_EXT: Record<string, BundledLanguage> = {
+  ts: 'typescript',
+  tsx: 'tsx',
+  js: 'javascript',
+  jsx: 'jsx',
+  json: 'json',
+  md: 'markdown',
+  css: 'css',
+  scss: 'scss',
+  html: 'html',
+  svg: 'xml',
+  yml: 'yaml',
+  yaml: 'yaml',
+  sh: 'bash',
+  toml: 'toml',
 }
 
-.App {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}`,
-    language: 'css',
-  },
-  'src/main.tsx': {
-    content: `import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+function getLanguage(path: string): BundledLanguage {
+  const ext = path.split('.').pop() ?? ''
+  return LANGUAGE_BY_EXT[ext] ?? 'text'
+}
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)`,
-    language: 'tsx',
-  },
-  'package.json': {
-    content: `{
-  "name": "sandbox-app",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.2"
+function normalizePath(path: string) {
+  return path
+    .replace(/^\$HOME\/project\/?/, '')
+    .replace(/^\/home\/user\/project\/?/, '')
+    .replace(/^\//, '')
+}
+
+function buildPathTypeMap(
+  nodes: FileTreeNode[],
+  map: Map<string, FileTreeNode['type']>,
+) {
+  for (const node of nodes) {
+    map.set(normalizePath(node.path), node.type)
+    if (node.children) buildPathTypeMap(node.children, map)
   }
-}`,
-    language: 'json',
-  },
-  'vite.config.ts': {
-    content: `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-})`,
-    language: 'typescript',
-  },
-  'index.html': {
-    content: `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sandbox App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>`,
-    language: 'html',
-  },
 }
 
-const DEFAULT_FILE = 'src/App.tsx'
+function collectFilePaths(nodes: FileTreeNode[], out: string[]) {
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      out.push(node.path)
+    } else if (node.children) {
+      collectFilePaths(node.children, out)
+    }
+  }
+}
 
-export function CodeView() {
+const DEFAULT_FILE_ORDER = [
+  'README.md',
+  'package.json',
+  'src/main.tsx',
+  'src/App.tsx',
+  'index.html',
+  'vite.config.ts',
+]
+
+function chooseDefaultFile(paths: string[]): string | null {
+  const normalized = new Map<string, string>()
+  for (const path of paths) {
+    normalized.set(normalizePath(path).toLowerCase(), path)
+  }
+  for (const preferred of DEFAULT_FILE_ORDER) {
+    const match = normalized.get(preferred.toLowerCase())
+    if (match) return match
+  }
+  return paths[0] ?? null
+}
+
+export function CodeView({ fileTree, onReadFile, onReadFiles }: CodeViewProps) {
   const [selectedPath, setSelectedPath] = useState<string>(DEFAULT_FILE)
-  const [expandedPaths] = useState<Set<string>>(new Set(['src']))
+  const [fileContent, setFileContent] = useState<FileContent | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [contentCache, setContentCache] = useState<Record<string, FileContent>>(
+    {},
+  )
 
-  const selectedFile = MOCK_FILES[selectedPath]
-  const filename = selectedPath.split('/').pop() || selectedPath
+  const pathTypeMap = useMemo(() => {
+    const map = new Map<string, FileTreeNode['type']>()
+    buildPathTypeMap(fileTree, map)
+    return map
+  }, [fileTree])
+
+  const resolvedSelectedPath = useMemo(() => {
+    if (!fileTree.length) return normalizePath(selectedPath)
+    if (selectedPath && selectedPath !== DEFAULT_FILE) {
+      return normalizePath(selectedPath)
+    }
+    const allFiles: string[] = []
+    collectFilePaths(fileTree, allFiles)
+    const defaultFile = chooseDefaultFile(allFiles)
+    return normalizePath(defaultFile ?? selectedPath)
+  }, [fileTree, selectedPath])
+
+  const loadFile = async (path: string, normalizedPath?: string) => {
+    if (normalizedPath && contentCache[normalizedPath]) {
+      setFileContent(contentCache[normalizedPath])
+      setSelectedPath(normalizedPath)
+      return
+    }
+    setIsLoading(true)
+    try {
+      const result = await onReadFile(path)
+      if (normalizedPath) {
+        setContentCache((prev) => ({ ...prev, [normalizedPath]: result }))
+      }
+      setFileContent(result)
+      if (normalizedPath) {
+        setSelectedPath(normalizedPath)
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSelect = (path: string) => {
+    if (pathTypeMap.get(path) === 'dir') return
+    const absolutePath = `/home/user/project/${path}`
+    void loadFile(absolutePath, path)
+  }
+
+  useEffect(() => {
+    if (!fileTree.length) return
+    if (fileContent) return
+    const allFiles: string[] = []
+    collectFilePaths(fileTree, allFiles)
+    const defaultFile = chooseDefaultFile(allFiles)
+    if (defaultFile) {
+      const normalized = normalizePath(defaultFile)
+      void loadFile(defaultFile, normalized)
+    }
+  }, [fileTree, fileContent])
+
+  useEffect(() => {
+    if (!fileTree.length || !onReadFiles) return
+    const allFiles: string[] = []
+    collectFilePaths(fileTree, allFiles)
+    const normalized = allFiles.map(normalizePath)
+
+    const isUiFile = (path: string) =>
+      path.startsWith('src/components/ui/') || path === 'src/components/ui'
+
+    const stage1Set = new Set([
+      ...DEFAULT_FILE_ORDER,
+      ...normalized.filter(
+        (path) => !path.includes('/') || path === 'README.md',
+      ),
+    ])
+
+    const stage2Set = new Set(
+      normalized.filter(
+        (path) =>
+          path.startsWith('src/') &&
+          path.split('/').length <= 3 &&
+          !isUiFile(path),
+      ),
+    )
+
+    const stage3Set = new Set(
+      normalized.filter(
+        (path) =>
+          !isUiFile(path) && !stage1Set.has(path) && !stage2Set.has(path),
+      ),
+    )
+
+    const toAbs = (path: string) => `/home/user/project/${path}`
+
+    const mergeResults = (result?: {
+      files: Record<string, string>
+      truncated: Record<string, boolean>
+    }) => {
+      if (!result) return
+      setContentCache((prev) => {
+        const next = { ...prev }
+        for (const [path, content] of Object.entries(result.files)) {
+          const normalizedPath = normalizePath(path)
+          if (!normalizedPath) continue
+          next[normalizedPath] = {
+            content,
+            truncated: result.truncated[path] ?? false,
+          }
+        }
+        return next
+      })
+    }
+
+    void onReadFiles(Array.from(stage1Set).map(toAbs))
+      .then((result) => {
+        mergeResults(result)
+        return onReadFiles(Array.from(stage2Set).map(toAbs))
+      })
+      .then((result) => {
+        mergeResults(result)
+        return onReadFiles(Array.from(stage3Set).map(toAbs))
+      })
+      .then((result) => {
+        mergeResults(result)
+      })
+      .catch(() => undefined)
+  }, [fileTree, onReadFiles])
+
+  const filename =
+    normalizePath(resolvedSelectedPath).split('/').pop() ||
+    normalizePath(resolvedSelectedPath)
+  const language = getLanguage(resolvedSelectedPath)
+
+  const fileList = useMemo(() => {
+    const allFiles: string[] = []
+    collectFilePaths(fileTree, allFiles)
+    return allFiles.map(normalizePath)
+  }, [fileTree])
+
+  if (!fileList.length) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        No files found
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full w-full overflow-hidden">
-      {/* File Tree - 20% width */}
-      <div className="w-1/5 min-w-[200px] max-w-[280px] border-r border-border overflow-auto bg-background">
-        <div className="p-2 border-b border-border">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Files
-          </span>
-        </div>
-        <FileTree
-          selectedPath={selectedPath}
-          onSelect={setSelectedPath}
-          defaultExpanded={expandedPaths}
-          className="border-none rounded-none"
-        >
-          <FileTreeFolder path="src" name="src">
-            <FileTreeFile path="src/App.tsx" name="App.tsx" />
-            <FileTreeFile path="src/index.css" name="index.css" />
-            <FileTreeFile path="src/main.tsx" name="main.tsx" />
-          </FileTreeFolder>
-          <FileTreeFile path="index.html" name="index.html" />
-          <FileTreeFile path="package.json" name="package.json" />
-          <FileTreeFile path="vite.config.ts" name="vite.config.ts" />
-        </FileTree>
-      </div>
+      <FileTree
+        files={fileList}
+        selectedFile={resolvedSelectedPath}
+        onSelectFile={handleSelect}
+      />
 
-      {/* Code Block - 80% width */}
-      <div className="flex-1 overflow-auto bg-background">
-        {selectedFile ? (
+      <div className="flex-1 flex flex-col overflow-hidden bg-background">
+        {isLoading && !fileContent ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            Loading file...
+          </div>
+        ) : fileContent ? (
           <CodeBlock
-            code={selectedFile.content}
-            language={selectedFile.language}
-            showLineNumbers
-            className="h-full rounded-none border-none"
+            key={resolvedSelectedPath}
+            data={[
+              {
+                language,
+                filename: resolvedSelectedPath,
+                code: fileContent.content,
+              },
+            ]}
+            value={resolvedSelectedPath}
+            className={cn(
+              'h-full rounded-none border-0 bg-background flex flex-col',
+            )}
           >
-            <CodeBlockHeader className="h-[37px]">
-              <CodeBlockTitle>
-                <FileIcon size={14} />
-                <CodeBlockFilename>{filename}</CodeBlockFilename>
-              </CodeBlockTitle>
-              <CodeBlockActions>
-                <CodeBlockCopyButton />
-              </CodeBlockActions>
+            <CodeBlockHeader className="px-4 py-2 bg-secondary/50">
+              <div className="flex items-center gap-2 flex-1">
+                <CodeBlockFilename value={resolvedSelectedPath}>
+                  {filename}
+                </CodeBlockFilename>
+              </div>
+              <CodeBlockCopyButton className="size-8" />
             </CodeBlockHeader>
+
+            <div className="flex-1 overflow-auto">
+              <CodeBlockBody>
+                {() => (
+                  <CodeBlockItem
+                    value={resolvedSelectedPath}
+                    lineNumbers
+                    className="relative"
+                  >
+                    <CodeBlockContent language={language}>
+                      {fileContent.content}
+                    </CodeBlockContent>
+                  </CodeBlockItem>
+                )}
+              </CodeBlockBody>
+            </div>
           </CodeBlock>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
