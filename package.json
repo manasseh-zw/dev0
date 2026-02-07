@@ -6,6 +6,7 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "bun .output/server/index.mjs",
     "test": "vitest run",
     "test:sandbox": "vitest run tests/sandbox.test.ts",
     "format": "prettier --write .",

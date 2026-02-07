@@ -3,10 +3,10 @@ import { defineConfig } from 'drizzle-kit'
 
 config({ path: '.env.local' })
 
-const databaseProvider = process.env.DATABASE_PROVIDER ?? 'neon'
+const databaseProvider = process.env.DATABASE_PROVIDER ?? 'supabase'
 
 function getDatabaseUrl() {
-  if (databaseProvider === 'neon') {
+  if (databaseProvider === 'supabase') {
     if (!process.env.DATABASE_URL) {
       throw new Error('Missing required environment variable: DATABASE_URL')
     }
