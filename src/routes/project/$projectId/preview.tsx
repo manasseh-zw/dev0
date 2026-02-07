@@ -19,6 +19,7 @@ import {
   getProjectFileContent,
   getProjectFileContents,
   getProjectFileTree,
+  resetProjectPreview,
   startProjectPreview,
 } from '@/lib/actions'
 
@@ -55,6 +56,19 @@ function savePreviewCache(projectId: string, cache: PreviewCache) {
   const store: Record<string, PreviewCache> = raw ? JSON.parse(raw) : {}
   store[projectId] = cache
   window.sessionStorage.setItem(PREVIEW_CACHE_KEY, JSON.stringify(store))
+}
+
+function clearPreviewCache(projectId: string) {
+  if (typeof window === 'undefined') return
+  const raw = window.sessionStorage.getItem(PREVIEW_CACHE_KEY)
+  if (!raw) return
+  try {
+    const store = JSON.parse(raw) as Record<string, PreviewCache>
+    delete store[projectId]
+    window.sessionStorage.setItem(PREVIEW_CACHE_KEY, JSON.stringify(store))
+  } catch {
+    window.sessionStorage.removeItem(PREVIEW_CACHE_KEY)
+  }
 }
 
 function PreviewPage() {
@@ -144,12 +158,54 @@ function PreviewPage() {
     }
   }
 
+  const resetPreview = async () => {
+    const startTime = Date.now()
+    setIsLoading(true)
+    setPreviewError(null)
+    setSandboxUrl(undefined)
+    setFileTree([])
+    setFileContents({})
+    setFileTruncated({})
+    setIsInitialized(false)
+    clearPreviewCache(projectId)
+    setLoadingStep(0)
+    if (stepTimerRef.current) {
+      window.clearInterval(stepTimerRef.current)
+    }
+    stepTimerRef.current = window.setInterval(() => {
+      setLoadingStep((prev) => Math.min(prev + 1, loadingSteps.length - 1))
+    }, 1600)
+
+    try {
+      const preview = await resetProjectPreview({ data: { projectId } })
+      setSandboxUrl(preview.previewUrl)
+      const tree = await getProjectFileTree({ data: { projectId } })
+      setFileTree(tree)
+      setIsInitialized(true)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to reset preview'
+      setPreviewError(message)
+    } finally {
+      const elapsed = Date.now() - startTime
+      const remaining = 5000 - elapsed
+      if (remaining > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, remaining))
+      }
+      if (stepTimerRef.current) {
+        window.clearInterval(stepTimerRef.current)
+        stepTimerRef.current = null
+      }
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     persistCache()
   }, [sandboxUrl, fileTree, fileContents, fileTruncated, isInitialized])
 
   const handleSync = () => {
-    void loadPreview()
+    void resetPreview()
   }
 
   const readFile = useMemo(

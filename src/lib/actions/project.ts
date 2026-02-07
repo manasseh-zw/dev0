@@ -17,6 +17,15 @@ type Project = InferSelectModel<typeof projects>
 type Task = InferSelectModel<typeof tasks>
 type GeminiModel = InferSelectModel<typeof tasks>['geminiModel']
 
+const createTaskSchema = z.object({
+  projectId: z.string(),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  geminiModel: z
+    .enum(['gemini-3-flash-preview', 'gemini-3-pro-preview'])
+    .optional(),
+})
+
 const createProjectSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
@@ -187,6 +196,54 @@ export const getProject = createServerFn({ method: 'GET' })
       ...project[0],
       tasks: computeBlockedStatus(projectTasks),
     }
+  })
+
+/**
+ * Create a task for a project
+ */
+export const createTask = createServerFn({ method: 'POST' })
+  .inputValidator(createTaskSchema)
+  .handler(async ({ data }) => {
+    const project = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, data.projectId))
+      .limit(1)
+
+    if (!project[0]) {
+      throw new Error('Project not found')
+    }
+
+    const [lastTask] = await db
+      .select({ phase: tasks.phase, order: tasks.order })
+      .from(tasks)
+      .where(eq(tasks.projectId, data.projectId))
+      .orderBy(desc(tasks.phase), desc(tasks.order))
+      .limit(1)
+
+    const phase = lastTask?.phase ?? 1
+    const order = (lastTask?.order ?? -1) + 1
+
+    const [task] = await db
+      .insert(tasks)
+      .values({
+        id: randomUUID(),
+        projectId: data.projectId,
+        title: data.title,
+        description: data.description,
+        phase,
+        order,
+        status: 'PENDING',
+        geminiModel: data.geminiModel ?? 'gemini-3-flash-preview',
+        dependencies: [],
+      })
+      .returning()
+
+    if (!task) {
+      throw new Error('Failed to create task')
+    }
+
+    return task
   })
 
 export type TaskWithBlocked = Task & { isBlocked: boolean }

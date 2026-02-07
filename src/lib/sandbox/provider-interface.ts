@@ -50,6 +50,7 @@ export type SandboxProvider = {
     options?: { depth?: number },
   ): Promise<SandboxFileEntry[]>
   readFile(sandboxId: string, path: string): Promise<string>
+  resetProjectSandbox(projectId: string): Promise<SandboxInstance>
   stopSandbox(sandboxId: string): Promise<void>
   deleteSandbox(sandboxId: string): Promise<void>
   getSandbox(sandboxId: string): Promise<SandboxInstance>

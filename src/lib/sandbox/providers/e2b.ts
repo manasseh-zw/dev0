@@ -400,6 +400,39 @@ export const e2bProvider: SandboxProvider = {
     })
   },
 
+  async resetProjectSandbox(projectId: string): Promise<SandboxInstance> {
+    const existing = await db
+      .select()
+      .from(sandboxes)
+      .where(eq(sandboxes.projectId, projectId))
+
+    await Promise.all(
+      existing.map(async (sandboxRecord) => {
+        try {
+          const sandbox = await connectSandbox(sandboxRecord.sandboxId)
+          await sandbox.kill()
+        } catch (error) {
+          globalLogger.warn('sandbox', 'Failed to kill sandbox during reset', {
+            sandboxId: sandboxRecord.id,
+            e2bSandboxId: sandboxRecord.sandboxId,
+            error: error instanceof Error ? error.message : 'unknown error',
+          })
+        }
+
+        await db
+          .update(sandboxes)
+          .set({ status: 'STOPPED' })
+          .where(eq(sandboxes.id, sandboxRecord.id))
+      }),
+    )
+
+    const project = await getProjectRecord(projectId)
+    return this.createSandbox({
+      projectId,
+      techStack: project.techStack as CreateSandboxConfig['techStack'],
+    })
+  },
+
   async executeCommand(
     sandboxId: string,
     command: string,
@@ -634,6 +667,10 @@ export const e2bProvider: SandboxProvider = {
       envs: {
         PORT: '3000',
         HOST: '0.0.0.0',
+        BIND_ADDRESS: '0.0.0.0',
+        VITE_HOST: '0.0.0.0',
+        VITE_PORT: '3000',
+        NEXT_TELEMETRY_DISABLED: '1',
       },
     })
   },

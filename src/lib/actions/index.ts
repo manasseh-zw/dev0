@@ -1,6 +1,7 @@
 // Project Actions
 export {
   createProject,
+  createTask,
   getProject,
   getProjects,
   getProjectTasks,
@@ -20,6 +21,7 @@ export { getPreview, type PreviewOutput } from './preview'
 // Project Preview Actions
 export {
   startProjectPreview,
+  resetProjectPreview,
   getProjectFileTree,
   getProjectFileContent,
   getProjectFileContents,

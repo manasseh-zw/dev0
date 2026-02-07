@@ -85,6 +85,12 @@ export async function readFile(
   return provider.readFile(sandboxId, path)
 }
 
+export async function resetProjectSandbox(
+  projectId: string,
+): Promise<SandboxInstance> {
+  return provider.resetProjectSandbox(projectId)
+}
+
 export async function stopSandbox(sandboxId: string): Promise<void> {
   return provider.stopSandbox(sandboxId)
 }

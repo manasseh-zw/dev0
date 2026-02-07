@@ -6,6 +6,7 @@ import {
   getPreviewUrl,
   listFiles,
   readFile,
+  resetProjectSandbox,
   startDevServer,
 } from '@/lib/sandbox/provider'
 
@@ -180,7 +181,33 @@ export const startProjectPreview = createServerFn({ method: 'POST' })
     }
 
     const sandbox = await getOrCreateProjectSandbox(data.projectId)
-    await startDevServer(sandbox.id, 'bun run dev')
+    await startDevServer(
+      sandbox.id,
+      'bun run dev -- --host 0.0.0.0 --port 3000',
+    )
+    const previewUrl = await getPreviewUrl(sandbox.id, 3000)
+
+    return {
+      sandboxId: sandbox.id,
+      previewUrl,
+    }
+  })
+
+export const resetProjectPreview = createServerFn({ method: 'POST' })
+  .inputValidator(previewStartSchema)
+  .handler(async ({ data }) => {
+    if (isMockProjectId(data.projectId)) {
+      return {
+        sandboxId: 'mock',
+        previewUrl: 'https://ui.shadcn.com/',
+      }
+    }
+
+    const sandbox = await resetProjectSandbox(data.projectId)
+    await startDevServer(
+      sandbox.id,
+      'bun run dev -- --host 0.0.0.0 --port 3000',
+    )
     const previewUrl = await getPreviewUrl(sandbox.id, 3000)
 
     return {

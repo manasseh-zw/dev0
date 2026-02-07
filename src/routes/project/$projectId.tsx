@@ -31,6 +31,7 @@ export const Route = createFileRoute('/project/$projectId')({
 
 function ProjectLayout() {
   const { pathname } = useLocation()
+  const project = Route.useLoaderData()
 
   // Determine the title based on the current route
   const getTitle = () => {
@@ -50,7 +51,7 @@ function ProjectLayout() {
 
   return (
     <div className="flex flex-col flex-1 w-full h-full overflow-hidden">
-      <ProjectHeader title={title} />
+      <ProjectHeader title={title} repoUrl={project.repoUrl} />
       <Outlet />
     </div>
   )
