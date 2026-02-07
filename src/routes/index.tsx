@@ -1,5 +1,3 @@
-'use client'
-
 import { ChatWelcomeScreen } from '@/components/landing'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ThemeSwitcher } from '@/components/theme-switcher'
@@ -8,7 +6,10 @@ import { useStore } from '@tanstack/react-store'
 import { getPreview } from '@/lib/actions'
 import { appStore, appActions } from '@/lib/state'
 
-export const Route = createFileRoute('/')({ component: App })
+export const Route = createFileRoute('/')({
+  ssr: false,
+  component: App,
+})
 
 function App() {
   const navigate = useNavigate()
