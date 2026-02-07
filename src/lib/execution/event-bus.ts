@@ -30,6 +30,11 @@ export type ExecutionEvent =
     }
 
 class ExecutionEventBus extends EventEmitter {
+  constructor() {
+    super()
+    this.setMaxListeners(100)
+  }
+
   emit(event: ExecutionEvent): boolean
   emit(eventName: string | symbol, ...args: unknown[]): boolean
   emit(
