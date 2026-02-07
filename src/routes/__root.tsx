@@ -8,6 +8,7 @@ import {
 
 import appCss from '@/styles.css?url'
 import { ThemeProvider } from '@/components/theme-provider'
+import { RealtimeClientProvider } from '@/components/realtime-provider'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -70,14 +71,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <RealtimeClientProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </RealtimeClientProvider>
 
         <Scripts />
       </body>

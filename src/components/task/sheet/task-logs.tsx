@@ -2,14 +2,21 @@
 
 import * as React from 'react'
 import type { TaskWithLogs } from '@/lib/types/task'
-import {
-  useExecutionEvents,
-  type ExecutionLogEntry,
-} from '@/lib/hooks/use-execution-events'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { CommandLineIcon } from '@hugeicons/core-free-icons'
 import { GeminiEventRenderer } from './gemini-event-renderer'
 import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
+import { useRealtime } from '@/lib/realtime/client'
+import { getExecutionChannel } from '@/lib/realtime/schema'
+
+type ExecutionLogEntry = {
+  id: string
+  timestamp: string
+  taskId: string
+  stream: 'stdout' | 'stderr'
+  message: string
+  geminiEvent?: GeminiStreamEvent
+}
 
 interface TaskLogsProps {
   task: TaskWithLogs
@@ -26,35 +33,46 @@ export function TaskLogs({
 }: TaskLogsProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const [liveLogs, setLiveLogs] = React.useState<ExecutionLogEntry[]>([])
+  const maxLogs = 500
+  const shouldListen = isRunning && Boolean(projectId)
+  const channel = shouldListen
+    ? getExecutionChannel(projectId as string)
+    : 'execution:disabled'
 
-  // Subscribe to live logs for running tasks
-  const { logs: streamingLogs } = useExecutionEvents(
-    isRunning ? projectId : undefined,
-    {
-      enabled: isRunning && Boolean(projectId),
-      onLog: (entry) => {
-        if (entry.taskId === task.id) {
-          setLiveLogs((prev) => [...prev, entry])
-        }
-      },
-    },
-  )
-
-  // Filter streaming logs for this specific task
-  const taskLogs = React.useMemo(() => {
-    return streamingLogs.filter((log) => log.taskId === task.id)
-  }, [streamingLogs, task.id])
-
-  // Combine live logs with streaming logs
-  const allLiveLogs = React.useMemo(() => {
-    const combined = [...liveLogs]
-    for (const log of taskLogs) {
-      if (!combined.some((l) => l.id === log.id)) {
-        combined.push(log)
+  useRealtime({
+    channels: [channel],
+    events: ['execution.task_log'],
+    onData: (payload) => {
+      if (!shouldListen) return
+      const data = payload.data as {
+        taskId: string
+        log: string
+        stream: 'stdout' | 'stderr'
+        geminiEvent?: GeminiStreamEvent
       }
-    }
-    return combined.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-  }, [liveLogs, taskLogs])
+      if (data.taskId !== task.id) return
+
+      const entry: ExecutionLogEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        timestamp: new Date().toISOString(),
+        taskId: data.taskId,
+        stream: data.stream,
+        message: data.log,
+        geminiEvent: data.geminiEvent,
+      }
+      setLiveLogs((prev) => {
+        const next = [...prev, entry]
+        if (next.length > maxLogs) {
+          return next.slice(next.length - maxLogs)
+        }
+        return next
+      })
+    },
+  })
+
+  const allLiveLogs = React.useMemo(() => {
+    return [...liveLogs].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+  }, [liveLogs])
 
   const liveEventLogs = React.useMemo(
     () => allLiveLogs.filter((log) => Boolean(log.geminiEvent)),

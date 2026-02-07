@@ -9,10 +9,11 @@ import {
   startExecution,
   updateTaskStatus,
 } from '@/lib/actions'
-import { useExecutionEvents } from '@/lib/hooks/use-execution-events'
 import { statuses } from '@/components/task/mock-data/statuses'
 import { TaskColumn } from './task-column'
 import { TaskSheet } from '@/components/task/sheet'
+import { useRealtime } from '@/lib/realtime/client'
+import { getExecutionChannel } from '@/lib/realtime/schema'
 
 type TaskBoardProps = {
   /** Tasks with isBlocked pre-computed (from server action or mock data) */
@@ -39,40 +40,39 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
     Record<string, boolean>
   >({})
 
-  // Subscribe to execution events for real-time updates
-  useExecutionEvents(projectId, {
-    enabled: Boolean(projectId) && projectId !== 'mock',
-    onEvent: (event) => {
-      if (
-        event.type === 'task_started' ||
-        event.type === 'task_review' ||
-        event.type === 'task_failed'
-      ) {
-        setStartingTaskIds((current) => {
-          if (!current[event.taskId]) return current
-          const next = { ...current }
-          delete next[event.taskId]
-          return next
-        })
-        const nextStatus: TaskStatus =
-          event.type === 'task_started'
-            ? 'RUNNING'
-            : event.type === 'task_review'
-              ? 'REVIEW'
-              : 'FAILED'
-        setOptimisticStatuses((current) => ({
-          ...current,
-          [event.taskId]: nextStatus,
-        }))
-      }
-      // On task status changes, revalidate from server (single source of truth)
-      if (
-        event.type === 'task_started' ||
-        event.type === 'task_review' ||
-        event.type === 'task_failed'
-      ) {
-        router.invalidate()
-      }
+  const shouldListen = Boolean(projectId) && projectId !== 'mock'
+  const channel = shouldListen
+    ? getExecutionChannel(projectId)
+    : 'execution:disabled'
+
+  useRealtime({
+    channels: [channel],
+    events: [
+      'execution.task_started',
+      'execution.task_review',
+      'execution.task_failed',
+    ],
+    onData: (payload) => {
+      if (!shouldListen) return
+      const data = payload.data as { taskId: string }
+      setStartingTaskIds((current) => {
+        if (!current[data.taskId]) return current
+        const next = { ...current }
+        delete next[data.taskId]
+        return next
+      })
+
+      const nextStatus: TaskStatus =
+        payload.event === 'execution.task_started'
+          ? 'RUNNING'
+          : payload.event === 'execution.task_review'
+            ? 'REVIEW'
+            : 'FAILED'
+      setOptimisticStatuses((current) => ({
+        ...current,
+        [data.taskId]: nextStatus,
+      }))
+      router.invalidate()
     },
   })
 

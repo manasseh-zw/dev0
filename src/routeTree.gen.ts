@@ -13,6 +13,7 @@ import { Route as ProjectRouteImport } from './routes/project'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectProjectIdRouteImport } from './routes/project/$projectId'
+import { Route as ApiRealtimeRouteImport } from './routes/api/realtime'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ProjectProjectIdIndexRouteImport } from './routes/project/$projectId/index'
 import { Route as ProjectProjectIdReviewRouteImport } from './routes/project/$projectId/review'
@@ -42,6 +43,11 @@ const ProjectProjectIdRoute = ProjectProjectIdRouteImport.update({
   id: '/$projectId',
   path: '/$projectId',
   getParentRoute: () => ProjectRoute,
+} as any)
+const ApiRealtimeRoute = ApiRealtimeRouteImport.update({
+  id: '/api/realtime',
+  path: '/api/realtime',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLogsRoute = ApiLogsRouteImport.update({
   id: '/api/logs',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
   '/api/logs': typeof ApiLogsRoute
+  '/api/realtime': typeof ApiRealtimeRoute
   '/project/$projectId': typeof ProjectProjectIdRouteWithChildren
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
   '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
   '/api/logs': typeof ApiLogsRoute
+  '/api/realtime': typeof ApiRealtimeRoute
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
   '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
   '/project/$projectId': typeof ProjectProjectIdIndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/new': typeof NewRoute
   '/project': typeof ProjectRouteWithChildren
   '/api/logs': typeof ApiLogsRoute
+  '/api/realtime': typeof ApiRealtimeRoute
   '/project/$projectId': typeof ProjectProjectIdRouteWithChildren
   '/api/events/$projectId': typeof ApiEventsProjectIdRoute
   '/project/$projectId/preview': typeof ProjectProjectIdPreviewRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/new'
     | '/project'
     | '/api/logs'
+    | '/api/realtime'
     | '/project/$projectId'
     | '/api/events/$projectId'
     | '/project/$projectId/preview'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/new'
     | '/project'
     | '/api/logs'
+    | '/api/realtime'
     | '/api/events/$projectId'
     | '/project/$projectId/preview'
     | '/project/$projectId'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/new'
     | '/project'
     | '/api/logs'
+    | '/api/realtime'
     | '/project/$projectId'
     | '/api/events/$projectId'
     | '/project/$projectId/preview'
@@ -186,6 +198,7 @@ export interface RootRouteChildren {
   NewRoute: typeof NewRoute
   ProjectRoute: typeof ProjectRouteWithChildren
   ApiLogsRoute: typeof ApiLogsRoute
+  ApiRealtimeRoute: typeof ApiRealtimeRoute
   ApiEventsProjectIdRoute: typeof ApiEventsProjectIdRoute
 }
 
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/project/$projectId'
       preLoaderRoute: typeof ProjectProjectIdRouteImport
       parentRoute: typeof ProjectRoute
+    }
+    '/api/realtime': {
+      id: '/api/realtime'
+      path: '/api/realtime'
+      fullPath: '/api/realtime'
+      preLoaderRoute: typeof ApiRealtimeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/logs': {
       id: '/api/logs'
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewRoute: NewRoute,
   ProjectRoute: ProjectRouteWithChildren,
   ApiLogsRoute: ApiLogsRoute,
+  ApiRealtimeRoute: ApiRealtimeRoute,
   ApiEventsProjectIdRoute: ApiEventsProjectIdRoute,
 }
 export const routeTree = rootRouteImport

@@ -54,6 +54,10 @@ export const env = {
   APP_URL: optionalEnv('APP_URL', 'http://localhost:3000'),
   NODE_ENV: optionalEnv('NODE_ENV', 'development'),
 
+  // Upstash Realtime
+  UPSTASH_REDIS_REST_URL: requireEnv('UPSTASH_REDIS_REST_URL'),
+  UPSTASH_REDIS_REST_TOKEN: requireEnv('UPSTASH_REDIS_REST_TOKEN'),
+
   // Computed
   get isDev() {
     return this.NODE_ENV === 'development'

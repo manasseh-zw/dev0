@@ -2,7 +2,8 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { projects, tasks, taskLogs } from '@/lib/db/schema'
-import { executionBus } from '@/lib/execution/event-bus'
+import { realtime } from '@/lib/realtime/server'
+import { getExecutionChannel } from '@/lib/realtime/schema'
 import {
   executeGeminiStreaming,
   executeCommand,
@@ -22,6 +23,9 @@ type ProjectRunState = {
 }
 
 const projectState = new Map<string, ProjectRunState>()
+
+const getRealtimeChannel = (projectId: string) =>
+  realtime.channel(getExecutionChannel(projectId))
 
 type StartTaskResult = {
   taskId: string
@@ -122,8 +126,7 @@ export async function startTask(
       taskId: task.id,
       sandboxId,
     })
-    executionBus.emit({
-      type: 'task_started',
+    void getRealtimeChannel(projectId).emit('execution.task_started', {
       projectId,
       taskId: task.id,
       sandboxId,
@@ -174,8 +177,7 @@ export async function completeTask(
       })
       .where(eq(tasks.id, taskId))
 
-    executionBus.emit({
-      type: 'task_review',
+    void getRealtimeChannel(projectId).emit('execution.task_review', {
       projectId,
       taskId,
       prUrl: result.prUrl,
@@ -190,8 +192,7 @@ export async function completeTask(
       })
       .where(eq(tasks.id, taskId))
 
-    executionBus.emit({
-      type: 'task_failed',
+    void getRealtimeChannel(projectId).emit('execution.task_failed', {
       projectId,
       taskId,
       error: result.error ?? 'Task failed',
@@ -291,8 +292,7 @@ async function runTaskExecution(
           collectedEvents.push(geminiEvent)
         }
 
-        executionBus.emit({
-          type: 'task_log',
+        void getRealtimeChannel(projectId).emit('execution.task_log', {
           projectId,
           taskId: task.id,
           log: line,
@@ -301,8 +301,7 @@ async function runTaskExecution(
         })
       } catch {
         logger.logStream('stdout', line)
-        executionBus.emit({
-          type: 'task_log',
+        void getRealtimeChannel(projectId).emit('execution.task_log', {
           projectId,
           taskId: task.id,
           log: line,
@@ -330,13 +329,12 @@ async function runTaskExecution(
         },
         onStderr: (chunk) => {
           logger.logStream('stderr', chunk)
-          executionBus.emit({
-            type: 'task_log',
-            projectId,
-            taskId: task.id,
-            log: chunk,
-            stream: 'stderr',
-          })
+        void getRealtimeChannel(projectId).emit('execution.task_log', {
+          projectId,
+          taskId: task.id,
+          log: chunk,
+          stream: 'stderr',
+        })
         },
         onComplete: () => {
           if (!stdoutBuffer.trim()) return
@@ -993,8 +991,7 @@ async function handleTaskStartFailure(
     })
     .where(eq(tasks.id, taskId))
 
-  executionBus.emit({
-    type: 'task_failed',
+  void getRealtimeChannel(projectId).emit('execution.task_failed', {
     projectId,
     taskId,
     error: message,
