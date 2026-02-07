@@ -1,7 +1,7 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-# --- Install dependencies (Bun is fast here) ---
+# --- Install dependencies ---
 FROM base AS deps
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
@@ -14,9 +14,12 @@ COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
-# --- Production image (Bun is fast here) ---
+# --- Production image ---
 FROM base AS production
 ENV NODE_ENV=production
-COPY --from=build /app/.output ./.output
+ENV HOST=0.0.0.0
+ENV PORT=3000
+COPY --from=build /app/.output /app/.output
+COPY --from=build /app/public /app/public
 EXPOSE 3000
-CMD ["bun", ".output/server/index.mjs"]
+CMD ["bun", "--bun", ".output/server/index.mjs"]
