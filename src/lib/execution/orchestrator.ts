@@ -292,13 +292,17 @@ async function runTaskExecution(
           collectedEvents.push(geminiEvent)
         }
 
-        void getRealtimeChannel(projectId).emit('execution.task_log', {
-          projectId,
-          taskId: task.id,
-          log: line,
-          stream: 'stdout',
-          geminiEvent,
-        })
+        const shouldEmit =
+          !(geminiEvent?.type === 'message' && geminiEvent.role === 'user')
+        if (shouldEmit) {
+          void getRealtimeChannel(projectId).emit('execution.task_log', {
+            projectId,
+            taskId: task.id,
+            log: line,
+            stream: 'stdout',
+            geminiEvent,
+          })
+        }
       } catch {
         logger.logStream('stdout', line)
         void getRealtimeChannel(projectId).emit('execution.task_log', {

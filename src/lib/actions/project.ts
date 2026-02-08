@@ -398,6 +398,18 @@ export const getTaskWithLogs = createServerFn({ method: 'GET' })
       throw new Error('Task not found')
     }
 
+    const executionLogs = row.executionLogs
+    if (executionLogs?.events?.length) {
+      const hasUserMessage = executionLogs.events.some(
+        (event) => event.type === 'message' && event.role === 'user',
+      )
+      if (hasUserMessage) {
+        executionLogs.events = executionLogs.events.filter(
+          (event) => !(event.type === 'message' && event.role === 'user'),
+        )
+      }
+    }
+
     return {
       ...row.task,
       project: {
@@ -406,7 +418,7 @@ export const getTaskWithLogs = createServerFn({ method: 'GET' })
         repoName: row.projectRepoName ?? null,
         repoUrl: row.projectRepoUrl ?? null,
       },
-      executionLogs: row.executionLogs,
+      executionLogs,
     }
   })
 
