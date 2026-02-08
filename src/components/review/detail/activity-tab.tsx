@@ -11,6 +11,11 @@ import {
   ChainOfThoughtStep,
 } from '@/components/ai-elements/chain-of-thought'
 import { GeminiToolEvent } from '@/components/task/sheet/gemini-tool-event'
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from '@/components/ai-elements/message'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
@@ -160,20 +165,20 @@ export function ActivityTab({ task }: ActivityTabProps) {
                   </div>
                 )}
 
-                {event.type === 'message' && (
-                  <div
-                    className={cn(
-                      'text-sm rounded-lg p-3',
-                      event.role === 'user'
-                        ? 'bg-muted/50 border-l-2 border-muted-foreground/30 italic text-muted-foreground'
-                        : 'bg-background border border-border',
-                    )}
-                  >
-                    <p className="whitespace-pre-wrap line-clamp-6">
-                      {event.content}
-                    </p>
-                  </div>
-                )}
+                {event.type === 'message' &&
+                  (event.role === 'user' ? (
+                    <div className="text-sm rounded-lg p-3 bg-muted/50 border-l-2 border-muted-foreground/30 italic text-muted-foreground">
+                      <p className="whitespace-pre-wrap line-clamp-6">
+                        {event.content}
+                      </p>
+                    </div>
+                  ) : (
+                    <Message from="assistant">
+                      <MessageContent className="bg-background border border-border rounded-lg p-3">
+                        <MessageResponse>{event.content}</MessageResponse>
+                      </MessageContent>
+                    </Message>
+                  ))}
 
                 {(event.type === 'tool_use' ||
                   event.type === 'tool_result') && (

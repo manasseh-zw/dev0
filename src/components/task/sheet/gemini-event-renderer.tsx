@@ -3,6 +3,11 @@
 import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
 import { GeminiToolEvent } from '@/components/task/sheet/gemini-tool-event'
 import { cn } from '@/lib/utils'
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from '@/components/ai-elements/message'
 
 interface GeminiEventRendererProps {
   event: GeminiStreamEvent
@@ -24,16 +29,22 @@ export function GeminiEventRenderer({ event, className }: GeminiEventRendererPro
     case 'message':
       if (event.role === 'user') {
         return (
-          <div className={cn('py-2 text-sm text-muted-foreground italic border-l-2 border-muted pl-3 my-1', className)}>
+          <div
+            className={cn(
+              'py-2 text-sm text-muted-foreground italic border-l-2 border-muted pl-3 my-1',
+              className,
+            )}
+          >
             {event.content}
           </div>
         )
       }
-      // Assistant message
       return (
-        <div className={cn('py-2 text-sm whitespace-pre-wrap', className)}>
-          {event.content}
-        </div>
+        <Message from="assistant" className={cn('py-2', className)}>
+          <MessageContent>
+            <MessageResponse>{event.content}</MessageResponse>
+          </MessageContent>
+        </Message>
       )
     
     case 'tool_use':
