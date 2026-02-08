@@ -4,12 +4,17 @@ import * as React from 'react'
 import type { ReviewPRFile } from '@/lib/types/review'
 import { cn } from '@/lib/utils'
 import { shouldIgnoreDiffFile } from '@/lib/review/ignore-files'
+import { ChevronRightIcon } from 'lucide-react'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ChevronRightIcon,
-  FileIcon,
-  FolderIcon,
+  CssFile02Icon,
+  File01Icon,
+  Folder01Icon,
   FolderOpenIcon,
-} from 'lucide-react'
+  HtmlFile02Icon,
+  Jsx03Icon,
+  Typescript03Icon,
+} from '@hugeicons/core-free-icons'
 import {
   Collapsible,
   CollapsibleContent,
@@ -101,6 +106,44 @@ function getFileStatusIndicator(status: ReviewPRFile['status']) {
   }
 }
 
+function getFileIcon(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+
+  switch (ext) {
+    case 'js':
+    case 'jsx':
+      return (
+        <HugeiconsIcon icon={Jsx03Icon} className="size-4 text-yellow-500" />
+      )
+    case 'ts':
+    case 'tsx':
+      return (
+        <HugeiconsIcon
+          icon={Typescript03Icon}
+          className="size-4 text-blue-500"
+        />
+      )
+    case 'css':
+      return (
+        <HugeiconsIcon icon={CssFile02Icon} className="size-4 text-sky-500" />
+      )
+    case 'html':
+      return (
+        <HugeiconsIcon icon={HtmlFile02Icon} className="size-4 text-orange-500" />
+      )
+    case 'json':
+      return (
+        <HugeiconsIcon icon={File01Icon} className="size-4 text-emerald-500" />
+      )
+    case 'md':
+      return <HugeiconsIcon icon={File01Icon} className="size-4 text-slate-400" />
+    default:
+      return (
+        <HugeiconsIcon icon={File01Icon} className="size-4 text-muted-foreground" />
+      )
+  }
+}
+
 interface TreeNodeComponentProps {
   node: TreeNode
   selectedFile?: string
@@ -127,9 +170,15 @@ function TreeNodeComponent({
             )}
           />
           {isExpanded ? (
-            <FolderOpenIcon className="size-4 text-blue-500 shrink-0" />
+            <HugeiconsIcon
+              icon={FolderOpenIcon}
+              className="size-4 text-amber-500 shrink-0"
+            />
           ) : (
-            <FolderIcon className="size-4 text-blue-500 shrink-0" />
+            <HugeiconsIcon
+              icon={Folder01Icon}
+              className="size-4 text-amber-500 shrink-0"
+            />
           )}
           <span className="truncate">{node.name}</span>
         </CollapsibleTrigger>
@@ -164,7 +213,7 @@ function TreeNodeComponent({
       )}
     >
       <span className="size-3.5 shrink-0" /> {/* Spacer for alignment */}
-      <FileIcon className="size-4 text-muted-foreground shrink-0" />
+      {getFileIcon(node.name)}
       <span className="truncate flex-1">{node.name}</span>
       {/* Status indicator */}
       <span
