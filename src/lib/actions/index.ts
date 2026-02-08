@@ -6,6 +6,7 @@ export {
   getProjects,
   getProjectTasks,
   getTask,
+  getTaskWithLogs,
   updateTaskStatus,
   updateTaskModel,
   updateProjectStatus,

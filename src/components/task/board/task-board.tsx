@@ -5,6 +5,7 @@ import { useRouter } from '@tanstack/react-router'
 import { LayoutGroup } from 'motion/react'
 import type { TaskStatus, TaskWithBlocked } from '@/lib/types'
 import {
+  getTaskWithLogs,
   updateTaskModel,
   startExecution,
   updateTaskStatus,
@@ -14,6 +15,7 @@ import { TaskColumn } from './task-column'
 import { TaskSheet } from '@/components/task/sheet'
 import { useRealtime } from '@/lib/realtime/client'
 import { getExecutionChannel } from '@/lib/realtime/schema'
+import type { TaskWithLogs } from '@/lib/types/task'
 
 type TaskBoardProps = {
   /** Tasks with isBlocked pre-computed (from server action or mock data) */
@@ -23,12 +25,15 @@ type TaskBoardProps = {
 }
 
 type GeminiModel = 'gemini-3-flash-preview' | 'gemini-3-pro-preview'
+type TaskWithLogsOptional = TaskWithBlocked & {
+  executionLogs?: TaskWithLogs['executionLogs'] | null
+}
 
 export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
   const router = useRouter()
   const [items, setItems] = React.useState<TaskWithBlocked[]>(tasks)
   const [selectedTask, setSelectedTask] =
-    React.useState<TaskWithBlocked | null>(null)
+    React.useState<TaskWithLogsOptional | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [optimisticStatuses, setOptimisticStatuses] = React.useState<
     Record<string, TaskStatus>
@@ -112,11 +117,15 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
       }
       return changed ? next : current
     })
-    // Update selected task if it changed
+    // Update selected task if it changed, preserve loaded logs
     if (selectedTask) {
       const updated = tasks.find((t) => t.id === selectedTask.id)
       if (updated) {
-        setSelectedTask(updated)
+        setSelectedTask((current) =>
+          current
+            ? { ...updated, executionLogs: current.executionLogs }
+            : updated,
+        )
       }
     }
   }, [tasks, selectedTask?.id, optimisticStatuses])
@@ -262,10 +271,30 @@ export function TaskBoard({ tasks, projectId }: TaskBoardProps) {
   )
 
   // Handle task card click to open sheet
-  const handleTaskClick = React.useCallback((task: TaskWithBlocked) => {
-    setSelectedTask(task)
-    setSheetOpen(true)
-  }, [])
+  const handleTaskClick = React.useCallback(
+    async (task: TaskWithBlocked) => {
+      setSelectedTask(task)
+      setSheetOpen(true)
+
+      if (task.projectId === 'mock' || task.status === 'PENDING') {
+        return
+      }
+
+      try {
+        const taskWithLogs = await getTaskWithLogs({
+          data: { taskId: task.id },
+        })
+        setSelectedTask((current) =>
+          current && current.id === task.id
+            ? { ...current, executionLogs: taskWithLogs.executionLogs }
+            : current,
+        )
+      } catch (error) {
+        console.error('Failed to load task logs:', error)
+      }
+    },
+    [],
+  )
 
   return (
     <>

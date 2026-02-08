@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useParams, Await } from '@tanstack/react-router'
 import { Suspense } from 'react'
-import { Route as ProjectRoute } from '../../../$projectId'
-import { getReviewPRSummary } from '@/lib/actions'
+import { getReviewPRSummary, getTaskWithLogs } from '@/lib/actions'
 import { getMockProject, isMockProjectId } from '@/data/mock'
 import { ReviewDetailHeader } from '@/components/review/detail/review-detail-header'
 import { ReviewDetailContent } from '@/components/review/detail/review-detail-content'
@@ -12,6 +11,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
+import type { TaskWithLogs } from '@/lib/types/task'
 import type { ReviewPRSummary } from '@/lib/types/review'
 
 export const Route = createFileRoute('/project/$projectId/review/$taskId/')({
@@ -19,7 +19,13 @@ export const Route = createFileRoute('/project/$projectId/review/$taskId/')({
     const prDetailsPromise = getReviewPRSummary({
       data: { projectId: params.projectId, taskId: params.taskId },
     })
-    return { prDetailsPromise }
+    const taskPromise = isMockProjectId(params.projectId)
+      ? Promise.resolve(
+          getMockProject().tasks.find((task) => task.id === params.taskId) ??
+            null,
+        )
+      : getTaskWithLogs({ data: { taskId: params.taskId } })
+    return { prDetailsPromise, taskPromise }
   },
   component: ReviewDetailPage,
 })
@@ -28,42 +34,39 @@ function ReviewDetailPage() {
   const { taskId, projectId } = useParams({
     from: '/project/$projectId/review/$taskId/',
   })
-  const project = isMockProjectId(projectId)
-    ? getMockProject()
-    : ProjectRoute.useLoaderData()
-
-  const task = project.tasks.find((t) => t.id === taskId)
-  const { prDetailsPromise } = Route.useLoaderData()
-
-  if (!task) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <p className="text-muted-foreground">Task not found</p>
-        <Link
-          to="/project/$projectId/review"
-          params={{ projectId }}
-          className={cn(buttonVariants({ variant: 'outline' }), 'gap-1.5')}
-        >
-          <HugeiconsIcon icon={ArrowLeft02Icon} size={16} />
-          Back to Reviews
-        </Link>
-      </div>
-    )
-  }
+  const { prDetailsPromise, taskPromise } = Route.useLoaderData()
 
   return (
     <Suspense fallback={<ReviewDetailSkeleton />}>
-      <Await promise={prDetailsPromise}>
-        {(prDetails) => (
-          <ReviewDetailContentWrapper task={task} prDetails={prDetails} />
-        )}
+      <Await promise={taskPromise}>
+        {(task) =>
+          task ? (
+            <Await promise={prDetailsPromise}>
+              {(prDetails) => (
+                <ReviewDetailContentWrapper task={task} prDetails={prDetails} />
+              )}
+            </Await>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+              <p className="text-muted-foreground">Task not found</p>
+              <Link
+                to="/project/$projectId/review"
+                params={{ projectId }}
+                className={cn(buttonVariants({ variant: 'outline' }), 'gap-1.5')}
+              >
+                <HugeiconsIcon icon={ArrowLeft02Icon} size={16} />
+                Back to Reviews
+              </Link>
+            </div>
+          )
+        }
       </Await>
     </Suspense>
   )
 }
 
 interface ReviewDetailContentWrapperProps {
-  task: Task
+  task: Task | TaskWithLogs
   prDetails: ReviewPRSummary | null
 }
 
