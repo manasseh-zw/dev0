@@ -295,13 +295,6 @@ function PreviewPage() {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 {previewError}
               </div>
-            ) : !isInitialized ? (
-              <div className="flex items-center justify-center h-full">
-                <Button onClick={handleInitialize} className="gap-2">
-                  <HugeiconsIcon icon={ViewIcon} className="size-4" />
-                  Initialize sandbox
-                </Button>
-              </div>
             ) : isLoading && !sandboxUrl ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="flex flex-col items-center gap-3">
@@ -311,6 +304,25 @@ function PreviewPage() {
                   />
                   <span>{loadingSteps[loadingStep]}</span>
                 </div>
+              </div>
+            ) : !isInitialized ? (
+              <div className="flex items-center justify-center h-full">
+                <Button
+                  onClick={handleInitialize}
+                  className="gap-2"
+                  size="default"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <HugeiconsIcon
+                      icon={Loading03Icon}
+                      className="size-4 animate-spin"
+                    />
+                  ) : (
+                    <HugeiconsIcon icon={ViewIcon} className="size-4" />
+                  )}
+                  Initialize sandbox
+                </Button>
               </div>
             ) : (
               <WebPreviewBody src={sandboxUrl} />
