@@ -1,3 +1,4 @@
 export const MAX_TASK_LOGS = 500
 export const DEFAULT_COMMAND_TIMEOUT_MS = 600000
 export const MAX_TASK_CLAIM_ATTEMPTS = 3
+export const MAX_REPO_DESCRIPTION_CHARS = 350

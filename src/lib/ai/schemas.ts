@@ -12,7 +12,7 @@ export const previewOutputSchema = z.object({
   description: z
     .string()
     .describe(
-      'A detailed technical description that preserves key requirements, theme/styling cues, constraints, and implementation details from the user input',
+      'A concise 2-3 sentence description (max 300 characters) that preserves key requirements, theme/styling cues, and constraints',
     ),
   suggestedTechStack: z
     .enum(['tanstack-start', 'react-vite', 'nextjs'])

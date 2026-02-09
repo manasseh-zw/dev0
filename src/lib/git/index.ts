@@ -7,6 +7,7 @@ import {
 } from './content-generators'
 import { generateRepoName } from './utils'
 import type { TechStack } from '@/lib/templates'
+import { MAX_REPO_DESCRIPTION_CHARS } from '@/lib/constants'
 import type { Task } from '@/lib/types'
 
 export type CreateProjectRepositoryOptions = {
@@ -29,6 +30,11 @@ export async function createProjectRepository(
 ): Promise<ProjectRepositoryResult> {
   const { projectName, description, context, techStack, tasks } = options
 
+  const repoDescription =
+    description.length > MAX_REPO_DESCRIPTION_CHARS
+      ? `${description.slice(0, MAX_REPO_DESCRIPTION_CHARS - 3).trimEnd()}...`
+      : description
+
   const github = new GitHubProvider()
 
   const repoName = generateRepoName(projectName)
@@ -36,7 +42,7 @@ export async function createProjectRepository(
   const repo = await github.createFromTemplate({
     templateName: techStack,
     repoName,
-    description,
+    description: repoDescription,
     isPrivate: false,
   })
 

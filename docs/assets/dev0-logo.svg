@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  width="752"
+  height="265"
+  viewBox="0 0 752 265"
+  fill="currentColor"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <g transform="matrix(1,0,0,1,-1009,-645.645833)">
+    <g transform="matrix(1,0,0,1,-223,-35)">
+      <text
+        x="1232px"
+        y="944.2px"
+        style="font-family:'SKA_cubic01_75_CE'; font-size:300px; fill:currentColor;"
+      >
+        dev
+      </text>
+      <g transform="matrix(300,0,0,300,2019.5,944.2)" />
+      <text
+        x="1794.5px"
+        y="944.2px"
+        style="font-family:'SKA_cubic01_75_CE'; font-size:300px; stroke:currentColor; stroke-width:2.71px; fill:currentColor;"
+      >
+        0
+      </text>
+    </g>
+    <g transform="matrix(2.305205,0,0,2.310492,-830.045126,28.424796)">
+      <clipPath id="logo-clip">
+        <rect x="1045.856" y="270.225" width="61.011" height="97.919" />
+      </clipPath>
+      <g clip-path="url(#logo-clip)">
+        <g transform="matrix(196.842536,0,0,196.842536,1131.723926,393)" />
+        <text
+          x="1021px"
+          y="393px"
+          style="font-family:'1Bit'; font-weight:500; font-size:196.843px; fill:currentColor;"
+        >
+          0
+        </text>
+        <path
+          fill="currentColor"
+          d="M1119.421,380.697L1033.303,380.697L1033.303,257.671L1119.421,257.671L1119.421,380.697ZM1057.908,282.276L1045.605,282.276L1045.605,368.395L1094.816,368.395L1094.816,343.789L1082.513,343.789L1082.513,319.184L1070.211,319.184L1070.211,306.881L1057.908,306.881L1057.908,282.276ZM1094.816,343.789L1107.119,343.789L1107.119,269.973L1057.908,269.973L1057.908,282.276L1070.211,282.276L1070.211,294.579L1082.513,294.579L1082.513,319.184L1094.816,319.184L1094.816,343.789ZM1112.191,351.003L1102.046,351.003L1102.046,373.484L1107.119,373.484L1112.191,373.484L1112.191,351.003ZM1040.533,275.063L1050.678,275.063L1050.678,264.884L1045.605,264.884L1040.533,264.884L1040.533,275.063Z"
+        />
+      </g>
+    </g>
+  </g>
+</svg>

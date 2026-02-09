@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { ThemeSwitcher } from '@/components/theme-switcher'
+import { MAX_REPO_DESCRIPTION_CHARS } from '@/lib/constants'
 import { appStore, appActions } from '@/lib/state'
 import { createProject } from '@/lib/actions'
 import { useEffect } from 'react'
@@ -170,9 +171,11 @@ function NewProjectPage() {
                           placeholder="Describe your project..."
                           className="mt-2 max-h-40 overflow-y-auto resize-none"
                           rows={3}
+                          maxLength={MAX_REPO_DESCRIPTION_CHARS}
                         />
                         <p className="text-muted-foreground mt-2 text-xs">
-                          A brief description of what your project does.
+                          A brief description of what your project does. Max{' '}
+                          {MAX_REPO_DESCRIPTION_CHARS} characters.
                         </p>
                       </>
                     )}

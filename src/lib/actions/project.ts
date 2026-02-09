@@ -10,6 +10,7 @@ import { db } from '@/lib/db'
 import { projects, tasks, taskLogs } from '@/lib/db/schema'
 import { createProjectRepository } from '@/lib/git'
 import type { TechStack } from '@/lib/templates'
+import { MAX_REPO_DESCRIPTION_CHARS } from '@/lib/constants'
 import { randomUUID } from 'crypto'
 import type { InferSelectModel } from 'drizzle-orm'
 
@@ -20,7 +21,7 @@ type GeminiModel = InferSelectModel<typeof tasks>['geminiModel']
 const createTaskSchema = z.object({
   projectId: z.string(),
   title: z.string().min(1),
-  description: z.string().min(1),
+  description: z.string().min(1).max(MAX_REPO_DESCRIPTION_CHARS),
   geminiModel: z
     .enum(['gemini-3-flash-preview', 'gemini-3-pro-preview'])
     .optional(),
