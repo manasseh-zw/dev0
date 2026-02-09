@@ -22,18 +22,22 @@ import type {
 import { CommandExitError, Sandbox } from 'e2b'
 import { and, eq } from 'drizzle-orm'
 import { globalLogger } from '@/lib/logging'
+import { DEFAULT_COMMAND_TIMEOUT_MS } from '@/lib/constants'
 
 const DEFAULT_TEMPLATE = env.E2B_TEMPLATE
 const SANDBOX_HOME = '$HOME'
 const PROJECT_DIR = `${SANDBOX_HOME}/project`
 const PROJECT_ABS_DIR = '/home/user/project'
 
+const DOUBLE_QUOTE_ESCAPE_MAP: Record<string, string> = {
+  '\\': '\\\\',
+  '"': '\\"',
+  $: '\\$',
+  '`': '\\`',
+}
+
 function escapeForDoubleQuotes(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\$/g, '\\$')
-    .replace(/`/g, '\\`')
+  return value.replace(/[\\"$`]/g, (char) => DOUBLE_QUOTE_ESCAPE_MAP[char])
 }
 
 function escapeForSingleQuotes(value: string): string {
@@ -517,7 +521,7 @@ export const e2bProvider: SandboxProvider = {
 
     try {
       const result = await sandbox.commands.run(wrappedCommand, {
-        timeoutMs: options?.timeout ?? 600000,
+        timeoutMs: options?.timeout ?? DEFAULT_COMMAND_TIMEOUT_MS,
         onStdout: (chunk) => {
           stdout += chunk
           options?.onStdout?.(chunk)

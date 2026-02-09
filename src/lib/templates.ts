@@ -44,4 +44,4 @@ export function getAllTemplates(): TemplateConfig[] {
   return Object.values(TEMPLATES)
 }
 
-export const DEFAULT_TEMPLATE: TechStack = 'tanstack-start'
+export const DEFAULT_TEMPLATE: TechStack = 'react-vite'

@@ -12,12 +12,12 @@ export const previewOutputSchema = z.object({
   description: z
     .string()
     .describe(
-      'A technical one-liner summarizing what the project does and its key technology',
+      'A detailed technical description that preserves key requirements, theme/styling cues, constraints, and implementation details from the user input',
     ),
   suggestedTechStack: z
     .enum(['tanstack-start', 'react-vite', 'nextjs'])
     .describe(
-      'The recommended tech stack based on the project requirements. Use tanstack-start for full-stack apps with SSR, react-vite for simple SPAs, nextjs for complex apps requiring edge/serverless',
+      'The recommended tech stack based on the project requirements. Use react-vite for now; other stacks are disabled for stability',
     ),
 })
 

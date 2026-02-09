@@ -14,7 +14,7 @@ const PLANNER_SYSTEM_PROMPT = `You are a senior technical architect and project 
 
 Assume the chosen template already includes shadcn/ui, Tailwind CSS, and baseline configuration. Do not include setup or initialization tasks for these. Focus tasks on project-specific features, types, and app logic, and remove any irrelevant starter/template files when appropriate.
 
-All database operations must use Drizzle ORM (no other ORM). If environment variables are needed, include a task to add an env.ts module that loads them from the environment.
+This is a React + Vite client-only app. Do not include any server-side code, database setup, or environment variable management. If persistence is needed, use local storage via a small client utility.
 
 You will receive:
 - Project name and description
@@ -43,7 +43,7 @@ Create 5-20 atomic tasks that:
   - Use "gemini-3-pro-preview" for complex tasks (auth setup, complex state, architecture)
 
 ### Phase Guidelines:
-- **Phase 1: Foundation** - Project setup, database schema, core utilities
+- **Phase 1: Foundation** - Project setup and core client utilities
 - **Phase 2: Core Features** - Main functionality, key user flows
 - **Phase 3: Secondary Features** - Additional features, integrations
 - **Phase 4: Polish** - Styling, animations, error handling

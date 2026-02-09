@@ -41,7 +41,8 @@ export const createProject = createServerFn({ method: 'POST' })
   .inputValidator(createProjectSchema)
   .handler(async ({ data }) => {
     try {
-      const { name, description, vibeInput, techStack, theme } = data
+      const { name, description, vibeInput, theme } = data
+      const techStack: TechStack = 'react-vite'
 
       // Step 1: Create initial project
       const [project] = await db

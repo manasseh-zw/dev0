@@ -48,7 +48,7 @@ export const projects = pgTable(
     status: projectStatusEnum('status').default('PLANNING').notNull(),
     repoUrl: text('repo_url'),
     repoName: text('repo_name'),
-    techStack: text('tech_stack').default('tanstack-start').notNull(),
+    techStack: text('tech_stack').default('react-vite').notNull(),
     theme: text('theme').default('slate').notNull(),
     vibeInput: text('vibe_input'),
     specContent: text('spec_content'),

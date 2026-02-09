@@ -8,6 +8,7 @@ import { GeminiEventRenderer } from './gemini-event-renderer'
 import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'
 import { useRealtime } from '@/lib/realtime/client'
 import { getExecutionChannel } from '@/lib/realtime/schema'
+import { MAX_TASK_LOGS } from '@/lib/constants'
 
 type ExecutionLogEntry = {
   id: string
@@ -33,7 +34,7 @@ export function TaskLogs({
 }: TaskLogsProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const [liveLogs, setLiveLogs] = React.useState<ExecutionLogEntry[]>([])
-  const maxLogs = 500
+  const maxLogs = MAX_TASK_LOGS
   const shouldListen = isRunning && Boolean(projectId)
   const channel = shouldListen
     ? getExecutionChannel(projectId as string)
@@ -61,11 +62,10 @@ export function TaskLogs({
         geminiEvent: data.geminiEvent,
       }
       setLiveLogs((prev) => {
-        const next = [...prev, entry]
-        if (next.length > maxLogs) {
-          return next.slice(next.length - maxLogs)
+        if (prev.length >= maxLogs) {
+          return [...prev.slice(1), entry]
         }
-        return next
+        return [...prev, entry]
       })
     },
   })

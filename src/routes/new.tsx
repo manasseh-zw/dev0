@@ -10,6 +10,12 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { ThemeSwitcher } from '@/components/theme-switcher'
 import { appStore, appActions } from '@/lib/state'
 import { createProject } from '@/lib/actions'
@@ -19,22 +25,27 @@ export const Route = createFileRoute('/new')({ component: NewProjectPage })
 
 const techStacks = [
   {
+    id: 'react-vite',
+    title: 'React',
+    description: 'Pure React with Vite for fast development',
+    Icon: React,
+    disabled: false,
+  },
+  {
     id: 'nextjs',
     title: 'Next.js',
     description: 'Full-stack React framework with server-side rendering',
     Icon: Nextjs,
+    disabled: true,
+    tooltip: 'Coming soon',
   },
   {
     id: 'tanstack-start',
     title: 'TanStack Start',
     description: 'Full-stack framework powered by TanStack Router',
     Icon: TanStack,
-  },
-  {
-    id: 'react-vite',
-    title: 'React',
-    description: 'Pure React with Vite for fast development',
-    Icon: React,
+    disabled: true,
+    tooltip: 'Coming soon',
   },
 ]
 
@@ -59,7 +70,7 @@ function NewProjectPage() {
       description:
         previewData?.description ||
         'A modern web application built with the latest technologies.',
-      techStack: previewData?.suggestedTechStack || 'nextjs',
+      techStack: 'react-vite',
     },
     onSubmit: async ({ value }) => {
       try {
@@ -70,16 +81,16 @@ function NewProjectPage() {
             name: value.projectName,
             description: value.description,
             vibeInput,
-            techStack: value.techStack as
-              | 'tanstack-start'
-              | 'react-vite'
-              | 'nextjs',
+            techStack: 'react-vite',
           },
         })
 
         appActions.setCurrentProjectId(result.projectId)
 
-        navigate({ to: result.redirectUrl })
+        navigate({
+          to: '/project/$projectId',
+          params: { projectId: result.projectId },
+        })
       } catch (error) {
         console.error('Error creating project:', error)
         alert('Failed to create project. Please try again.')
@@ -159,8 +170,8 @@ function NewProjectPage() {
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
                           placeholder="Describe your project..."
-                          className="mt-2"
-                          rows={4}
+                          className="mt-2 max-h-40 overflow-y-auto resize-none"
+                          rows={3}
                         />
                         <p className="text-muted-foreground mt-2 text-xs">
                           A brief description of what your project does.
@@ -195,34 +206,61 @@ function NewProjectPage() {
                       value={field.state.value}
                       onValueChange={(value) => field.handleChange(value)}
                     >
-                      {techStacks.map((item) => (
-                        <div
-                          key={item.id}
-                          className="border-input has-data-[state=checked]:border-ring relative flex flex-col gap-3 rounded-lg border p-4 outline-none transition-colors hover:bg-muted/50"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                                <item.Icon className="size-5" />
+                      {techStacks.map((item) => {
+                        const card = (
+                          <div
+                            className={[
+                              'border-input has-data-[state=checked]:border-ring relative flex flex-col gap-3 rounded-lg border p-4 outline-none transition-colors',
+                              item.disabled
+                                ? 'cursor-not-allowed opacity-60'
+                                : 'hover:bg-muted/50',
+                            ].join(' ')}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+                                  <item.Icon className="size-5" />
+                                </div>
+                                <Label
+                                  htmlFor={item.id}
+                                  className={[
+                                    'text-foreground block text-sm font-medium',
+                                    item.disabled
+                                      ? 'cursor-not-allowed'
+                                      : 'cursor-pointer',
+                                  ].join(' ')}
+                                >
+                                  {item.title}
+                                </Label>
                               </div>
-                              <Label
-                                htmlFor={item.id}
-                                className="text-foreground block text-sm font-medium cursor-pointer"
-                              >
-                                {item.title}
-                              </Label>
+                              <RadioGroupItem
+                                id={item.id}
+                                value={item.id}
+                                disabled={item.disabled}
+                                className="after:absolute after:inset-0"
+                              />
                             </div>
-                            <RadioGroupItem
-                              id={item.id}
-                              value={item.id}
-                              className="after:absolute after:inset-0"
-                            />
+                            <p className="text-muted-foreground text-sm">
+                              {item.description}
+                            </p>
                           </div>
-                          <p className="text-muted-foreground text-sm">
-                            {item.description}
-                          </p>
-                        </div>
-                      ))}
+                        )
+
+                        if (!item.disabled) {
+                          return card
+                        }
+
+                        return (
+                          <TooltipProvider key={item.id}>
+                            <Tooltip>
+                              <TooltipTrigger render={card} />
+                              <TooltipContent>
+                                <p>{item.tooltip}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )
+                      })}
                     </RadioGroup>
                   )}
                 />

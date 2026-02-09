@@ -15,6 +15,7 @@ import {
   type GeminiStreamEvent,
 } from '@/lib/types/gemini-stream'
 import { createTaskLogger, globalLogger } from '@/lib/logging'
+import { MAX_TASK_CLAIM_ATTEMPTS } from '@/lib/constants'
 
 type ProjectRunState = {
   runningTaskId: string | null
@@ -223,8 +224,16 @@ export async function getNextRunnableTask(
   const isComplete = (status: Task['status'] | undefined) =>
     status === 'DONE' || status === 'SKIPPED'
 
-  const runnable = allTasks.find((task, index) => {
+  let hasPriorIncomplete = false
+  const runnable = allTasks.find((task) => {
     if (task.status !== 'PENDING') {
+      if (!isComplete(task.status)) {
+        hasPriorIncomplete = true
+      }
+      return false
+    }
+
+    if (hasPriorIncomplete) {
       return false
     }
 
@@ -233,14 +242,11 @@ export async function getNextRunnableTask(
     )
 
     if (hasUnmetDependencies) {
+      hasPriorIncomplete = true
       return false
     }
 
-    const hasPriorIncomplete = allTasks
-      .slice(0, index)
-      .some((prior) => !isComplete(prior.status))
-
-    return !hasPriorIncomplete
+    return true
   })
 
   return runnable ?? null
@@ -280,7 +286,8 @@ async function runTaskExecution(
       promptLength: prompt.length,
     })
 
-    let stdoutBuffer = ''
+    let stdoutRemainder = ''
+    let stdoutChunks: string[] = []
     const handleStdoutLine = (line: string) => {
       if (!line.trim()) return
       try {
@@ -324,27 +331,31 @@ async function runTaskExecution(
       {
         onStdout: (chunk) => {
           // Parse JSONL events from --output-format stream-json
-          stdoutBuffer += chunk
-          const lines = stdoutBuffer.split('\n')
-          stdoutBuffer = lines.pop() ?? ''
+          stdoutChunks.push(chunk)
+          if (!chunk.includes('\n')) return
+          const combined = stdoutRemainder + stdoutChunks.join('')
+          stdoutChunks = []
+          const lines = combined.split('\n')
+          stdoutRemainder = lines.pop() ?? ''
           for (const line of lines) {
             handleStdoutLine(line)
           }
         },
         onStderr: (chunk) => {
           logger.logStream('stderr', chunk)
-        void getRealtimeChannel(projectId).emit('execution.task_log', {
-          projectId,
-          taskId: task.id,
-          log: chunk,
-          stream: 'stderr',
-        })
+          void getRealtimeChannel(projectId).emit('execution.task_log', {
+            projectId,
+            taskId: task.id,
+            log: chunk,
+            stream: 'stderr',
+          })
         },
         onComplete: () => {
-          if (!stdoutBuffer.trim()) return
-          const line = stdoutBuffer.trim()
-          stdoutBuffer = ''
-          handleStdoutLine(line)
+          const tail = stdoutRemainder + stdoutChunks.join('')
+          stdoutChunks = []
+          stdoutRemainder = ''
+          if (!tail.trim()) return
+          handleStdoutLine(tail.trim())
         },
       },
     )
@@ -790,23 +801,34 @@ async function persistTaskLogs(
 ): Promise<void> {
   if (events.length === 0) return
 
-  // Extract stats from the result event if present
-  const resultEvent = events.find((e) => e.type === 'result')
-  const stats = resultEvent?.type === 'result' ? resultEvent.stats : undefined
+  let resultEvent: GeminiStreamEvent | undefined
+  let lastAssistantMessage: GeminiStreamEvent | undefined
+  let lastAssistantFullMessage: GeminiStreamEvent | undefined
+  let toolCallsCount = 0
 
-  // Find the last assistant message for summary, prefer non-delta content
-  const assistantMessages = events.filter(
-    (event) => event.type === 'message' && event.role === 'assistant',
-  )
-  const lastFullMessage = [...assistantMessages]
-    .reverse()
-    .find((event) => event.type === 'message' && !event.delta)
-  const lastMessage = lastFullMessage ?? assistantMessages.at(-1)
+  for (const event of events) {
+    if (event.type === 'result') {
+      resultEvent = event
+      continue
+    }
+
+    if (event.type === 'message' && event.role === 'assistant') {
+      lastAssistantMessage = event
+      if (!event.delta) {
+        lastAssistantFullMessage = event
+      }
+      continue
+    }
+
+    if (event.type === 'tool_use') {
+      toolCallsCount += 1
+    }
+  }
+
+  const stats = resultEvent?.type === 'result' ? resultEvent.stats : undefined
+  const lastMessage = lastAssistantFullMessage ?? lastAssistantMessage
   const summary =
     lastMessage?.type === 'message' ? lastMessage.content : undefined
-
-  // Count tool calls
-  const toolCallsCount = events.filter((e) => e.type === 'tool_use').length
 
   try {
     await db
@@ -858,7 +880,7 @@ function buildTaskPrompt(
     project.description ? `Description: ${project.description}` : null,
     project.repoName ? `Repo: ${project.repoName}` : null,
     project.repoUrl ? `Repo URL: ${project.repoUrl}` : null,
-    `Tech stack: ${project.techStack}`,
+    'Tech stack: react-vite (React + Vite)',
   ]
     .filter(Boolean)
     .join('\n')
@@ -890,7 +912,10 @@ Requirements:
 - Update TASKLIST.md if it exists.
 - Update LEARNINGS.md only when you discover a reusable insight or non-obvious fix.
 - Keep changes scoped to the task and run relevant checks if needed.
-- Assume this is a sandboxed environment; environment variables or external services are NOT configured. The database does NOT exist. NEVER make real network connections or run commands that require external services.
+- This is a React + Vite client-only project. Do not use Next.js or TanStack Start patterns.
+- Assume this is a sandboxed environment; environment variables or external services are NOT configured. The database does NOT exist.
+- If persistence is needed, use local storage via a small client utility.
+- NEVER make real network connections or run commands that require external services.
 - Use bun for installs and scripts (bun install, bun run, etc.).
 - If you add new environment variables, document them in .env.example.
 - Do NOT run build commands (bun run build, npm run build, etc.) or dev servers (bun run dev, npm run dev, etc.) in the sandbox - these will hang indefinitely and cause the task to fail.
@@ -902,7 +927,6 @@ Requirements:
 - When you MUST run CLI commands that prompt for confirmation, use --force or --yes flags, but prefer not to run such commands at all.
 - Shadcn UI components are already present in src/components/ui across all templates. Do NOT run the shadcn CLI; import from the existing components.
 - Do NOT delete or modify .gemini temp/state directories (e.g., $HOME/.gemini/tmp). Never run rm -rf on .gemini paths.
-- If this is a TanStack Start project, do not try to resolve route tree/type errors by running a dev server or build command; note the issue in LEARNINGS.md and proceed.
 - Do NOT run git commit, git push, or gh pr create.
  - Write a JSON file at ${runDir}/agent-result.json with:
    {"status":"success|failed","commitMessage":"...","prTitle":"...","prBody":"...","notes":"..."}
@@ -1030,7 +1054,7 @@ async function claimTaskForExecution(
   let lastFailedTaskId: string | null = null
   let lastFailedStatus: Task['status'] | null = null
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_TASK_CLAIM_ATTEMPTS; attempt += 1) {
     const task = await getNextRunnableTask(projectId)
     if (!task) {
       throw new Error('No runnable task found for this project')
