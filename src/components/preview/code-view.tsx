@@ -1,5 +1,3 @@
-'use client'
-
 import { useEffect, useMemo, useState } from 'react'
 import { FileTree } from '@/components/ui/file-tree'
 import {

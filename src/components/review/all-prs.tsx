@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReviewPRListItem } from '@/lib/types/review';
 import { useMemo } from 'react';
 import { ReviewGroup } from './review-group';

@@ -1,5 +1,3 @@
-'use client'
-
 import * as React from 'react'
 import type { Task } from '@/lib/types'
 import type { ReviewPRFile, ReviewPRSummary } from '@/lib/types/review'

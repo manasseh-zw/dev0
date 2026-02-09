@@ -1,5 +1,3 @@
-'use client'
-
 import { statuses } from '@/components/task/mock-data/statuses'
 import { TaskInfo } from '@/components/task/sheet/task-info'
 import { TaskLogs } from '@/components/task/sheet/task-logs'

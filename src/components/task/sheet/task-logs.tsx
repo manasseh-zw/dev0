@@ -1,5 +1,3 @@
-'use client'
-
 import * as React from 'react'
 import type { TaskWithLogs } from '@/lib/types/task'
 import { HugeiconsIcon } from '@hugeicons/react'

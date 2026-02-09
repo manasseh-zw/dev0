@@ -1,5 +1,3 @@
-'use client'
-
 import type { Task } from '@/lib/types'
 import type { ReviewPRSummary } from '@/lib/types/review'
 import { Badge } from '@/components/ui/badge'

@@ -1,5 +1,3 @@
-'use client'
-
 import type { Task } from '@/lib/types'
 import type { Status } from '@/components/task/mock-data/statuses'
 import { HugeiconsIcon } from '@hugeicons/react'

@@ -1,5 +1,3 @@
-'use client'
-
 import type { Task } from '@/lib/types'
 import type { TaskWithLogs } from '@/lib/types/task'
 import type { GeminiStreamEvent } from '@/lib/types/gemini-stream'

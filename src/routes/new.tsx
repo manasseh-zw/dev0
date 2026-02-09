@@ -1,5 +1,3 @@
-'use client'
-
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
 import { useStore } from '@tanstack/react-store'

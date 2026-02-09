@@ -1,5 +1,3 @@
-'use client'
-
 import { ReviewFilters } from '@/components/review/review-filters'
 
 export function ReviewSubHeader() {

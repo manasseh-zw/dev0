@@ -1,5 +1,3 @@
-'use client'
-
 import * as React from 'react'
 import type { ReviewPRFile } from '@/lib/types/review'
 import { cn } from '@/lib/utils'

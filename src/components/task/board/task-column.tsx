@@ -1,5 +1,3 @@
-'use client'
-
 import { AnimatePresence, motion } from 'motion/react'
 import type { TaskWithBlocked } from '@/lib/types'
 import { Status } from '@/components/task/mock-data/statuses'

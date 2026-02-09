@@ -1,5 +1,3 @@
-'use client'
-
 import type { Status } from '@/components/task/mock-data/statuses'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {

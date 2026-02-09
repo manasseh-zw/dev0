@@ -1,5 +1,3 @@
-'use client'
-
 import type { ReviewPRListItem } from '@/lib/types/review'
 import type { ReviewStatusConfig } from './review-statuses'
 import { format } from 'date-fns'

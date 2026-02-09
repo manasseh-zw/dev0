@@ -1,5 +1,3 @@
-'use client'
-
 import type { GeminiToolUseEvent, GeminiToolResultEvent } from '@/lib/types/gemini-stream'
 import {
   Tool,

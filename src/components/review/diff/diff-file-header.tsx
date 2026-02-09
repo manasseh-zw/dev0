@@ -1,5 +1,3 @@
-'use client'
-
 import type { ReviewPRFile } from '@/lib/types/review'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
